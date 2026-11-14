@@ -47,8 +47,32 @@ function directives(policy: string): Record<string, string[]> {
   );
 }
 
+/**
+ * What Vercel does with an address, for the three kinds of source vercel.json uses: an exact path, a
+ * path followed by one or more segments (`:path+`), and the catch-all. `:path*` is included with the
+ * behaviour seen on the live site: when nothing follows, the destination keeps a trailing slash.
+ */
+function applyRewrites(path: string): string {
+  for (const { source, destination } of config.rewrites) {
+    if (source.endsWith("/:path+") || source.endsWith("/:path*")) {
+      const prefix = source.slice(0, -"/:path+".length);
+      if (path === prefix) {
+        if (source.endsWith("*")) return destination.replace(":path*", "");
+        continue;
+      }
+      if (path.startsWith(`${prefix}/`) && path.length > prefix.length + 1) {
+        return destination.replace(/:path[+*]/, path.slice(prefix.length + 1));
+      }
+      continue;
+    }
+    if (source === "/(.*)" || source === path) return destination;
+  }
+  throw new Error(`no rewrite for ${path}`);
+}
+
 describe("the rewrites to the API", () => {
   const apiRewrites = config.rewrites.slice(0, -1);
+  const areas = [...new Set(apiRewrites.map((rewrite) => rewrite.source.split("/")[1]))];
 
   it("send each API area to the API on Fly, whose name is the one in fly.toml", () => {
     expect(flyApp).toBeTruthy();
@@ -57,39 +81,70 @@ describe("the rewrites to the API", () => {
     }
   });
 
-  it("keep the path as it is (the API has no /api prefix, and the cookies are for /)", () => {
-    for (const rewrite of apiRewrites) {
-      const area = rewrite.source.split("/")[1];
-      expect(rewrite.source).toBe(`/${area}/:path*`);
-      expect(rewrite.destination).toBe(`${API_ORIGIN}/${area}/:path*`);
+  it("have two for each area: the bare path, and the deeper paths (one or more segments)", () => {
+    expect(areas.length).toBeGreaterThanOrEqual(2);
+    for (const area of areas) {
+      expect(config.rewrites).toContainEqual({
+        source: `/${area}`,
+        destination: `${API_ORIGIN}/${area}`,
+      });
+      expect(config.rewrites).toContainEqual({
+        source: `/${area}/:path+`,
+        destination: `${API_ORIGIN}/${area}/:path+`,
+      });
+    }
+    expect(apiRewrites).toHaveLength(areas.length * 2);
+  });
+
+  it.each([
+    ["/projects", `${API_ORIGIN}/projects`],
+    ["/projects/abc", `${API_ORIGIN}/projects/abc`],
+    ["/projects/abc/documents/123", `${API_ORIGIN}/projects/abc/documents/123`],
+    ["/projects/abc/analyses/estimate", `${API_ORIGIN}/projects/abc/analyses/estimate`],
+    ["/auth", `${API_ORIGIN}/auth`],
+    ["/auth/login", `${API_ORIGIN}/auth/login`],
+    ["/auth/register", `${API_ORIGIN}/auth/register`],
+    ["/auth/refresh", `${API_ORIGIN}/auth/refresh`],
+  ])("send %s to %s, with the path exactly as it was", (path, destination) => {
+    expect(applyRewrites(path)).toBe(destination);
+  });
+
+  it("never add a trailing slash: /projects/ would be read as a project with an empty id (400)", () => {
+    for (const path of ["/projects", "/auth", "/projects/abc", "/auth/login"]) {
+      expect(applyRewrites(path).endsWith("/")).toBe(false);
     }
   });
 
+  it.each(["/", "/login", "/register", "/app", "/app/projects/abc", "/projectsfoo", "/authors"])(
+    "leave the page address %s to the page",
+    (path) => {
+      expect(applyRewrites(path)).toBe("/index.html");
+    },
+  );
+
   it("cover every area the development proxy forwards, so the two cannot drift apart", () => {
-    const areas = Object.keys(createApiProxy(undefined)).map((key) => {
+    const proxyAreas = Object.keys(createApiProxy(undefined)).map((key) => {
       const match = /^\^\/([a-z-]+)\(/.exec(key);
       if (match === null) throw new Error(`unexpected proxy key ${key}`);
       return match[1];
     });
-    expect(areas.length).toBeGreaterThanOrEqual(2);
-    expect(apiRewrites.map((rewrite) => rewrite.source.split("/")[1]).sort()).toEqual(
-      [...areas].sort(),
-    );
+    expect(proxyAreas.length).toBeGreaterThanOrEqual(2);
+    expect([...areas].sort()).toEqual([...proxyAreas].sort());
   });
 
   it("come before the fallback to the page, which would otherwise swallow them", () => {
     const fallback = config.rewrites.at(-1);
     expect(fallback).toEqual({ source: "/(.*)", destination: "/index.html" });
-    expect(config.rewrites.length).toBeGreaterThanOrEqual(3);
+    expect(config.rewrites.length).toBeGreaterThanOrEqual(5);
   });
 
   it("do not swallow an address the page itself uses", () => {
     const routes = readFileSync(join(WEB, "src", "routes.tsx"), "utf8");
     const paths = [...routes.matchAll(/path="([^"]+)"/g)].map((match) => match[1] ?? "");
     expect(paths.length).toBeGreaterThanOrEqual(5);
-    for (const rewrite of apiRewrites) {
-      const area = `/${rewrite.source.split("/")[1]}`;
-      expect(paths.filter((path) => path === area || path.startsWith(`${area}/`))).toEqual([]);
+    for (const area of areas) {
+      const prefix = `/${area}`;
+      expect(paths.filter((path) => path === prefix || path.startsWith(`${prefix}/`))).toEqual([]);
     }
   });
 });
