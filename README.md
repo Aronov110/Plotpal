@@ -37,6 +37,15 @@ bun run db:migrate
 Never edit a migration that has been merged; add a new one. Integration tests use the separate
 `*_test` database from `TEST_DATABASE_URL` and refuse to run against any other name.
 
+**Postgres versions.** The ids are UUIDv7 and the migrations use `uuidv7()` as their default, which is
+built into PostgreSQL 18 (the local Docker database). A server older than 18, such as Supabase's,
+does not have it, so `runMigrations` (also used by `bun run db:migrate` and by the Fly release step) first
+calls `ensureUuidv7` (`apps/api/src/db/uuidv7-shim.ts`): if the built-in function is missing it creates
+`public.uuidv7()` (RFC 9562, with a 42-bit counter so ids keep their creation order), and on
+PostgreSQL 18 it creates nothing. The migration files are not touched. To test against an older server,
+start `postgres:17.5-alpine` on a spare port and run the integration tests with `TEST_DATABASE_URL`
+pointing at it.
+
 ## Run
 
 ```sh
