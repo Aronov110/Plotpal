@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { expect, type Page } from "@playwright/test";
 import type { AxeResults, RunOptions } from "axe-core";
+import { waitForAnimationsToEnd } from "./motion.ts";
 
 const AXE_SOURCE = createRequire(import.meta.url).resolve("axe-core");
 
@@ -19,13 +20,7 @@ export async function expectNoAxeViolations(page: Page): Promise<void> {
   // Colours are measured at rest: something that is still fading in (an error message, a notice) has
   // a lower contrast for a moment, which is not what a person looks at. Wait for the animations that
   // have an end; the ones that never end (a spinner, a progress bar) are left running.
-  await page.evaluate(async () => {
-    const finite = document.getAnimations().filter((animation) => {
-      const iterations = animation.effect?.getComputedTiming().iterations;
-      return iterations !== undefined && Number.isFinite(iterations);
-    });
-    await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)));
-  });
+  await waitForAnimationsToEnd(page);
   await page.addScriptTag({ path: AXE_SOURCE });
   const violations = await page.evaluate(async (options) => {
     const { axe } = window as unknown as {

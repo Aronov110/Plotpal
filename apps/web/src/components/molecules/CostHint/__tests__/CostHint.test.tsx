@@ -1,9 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import {
+  describeAllowance,
+  describeCost,
+  describeSize,
+} from "../../../../lib/analyses/format-cost.ts";
 import { expectNoA11yViolations } from "../../../../test-support/a11y.ts";
 import { makeEstimate } from "../../../../test-support/analyses-handlers.ts";
-import { CostHint } from "../CostHint.tsx";
+import { CostHint, LOADING_SAMPLE } from "../CostHint.tsx";
 
 describe("CostHint", () => {
   it("shows nothing before the panel is opened", () => {
@@ -78,6 +83,44 @@ describe("CostHint", () => {
         <CostHint view={{ status: "failed", message: "Nope." }} onRetry={() => undefined} />
       </div>,
     );
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe("CostHint: no jump when the cost arrives", () => {
+  const loading = () =>
+    render(<CostHint view={{ status: "loading" }} onRetry={() => undefined} />).container;
+
+  it("holds the room the finished text will need, with an invisible sample under the words", () => {
+    const sizer = loading().querySelector(".cost-hint__sizer");
+    expect(sizer).not.toBeNull();
+    expect(sizer).toHaveTextContent(LOADING_SAMPLE);
+  });
+
+  it("hides the sample from assistive technology, so only the words are announced", () => {
+    const sizer = loading().querySelector(".cost-hint__sizer");
+    expect(sizer).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Working out the cost…")).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("is still one status that says the cost is being worked out", () => {
+    loading();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Working out the cost…");
+  });
+
+  it("has a sample about as long as a real hint, so the height is about right", () => {
+    const real = [
+      describeSize(180_000),
+      describeCost(makeEstimate({ costUsd: { low: 0.09, high: 0.33 } })),
+      describeAllowance({ runs: 10, tokens: 5 }),
+    ].join(" ");
+    expect(LOADING_SAMPLE.length).toBeGreaterThanOrEqual(real.length * 0.8);
+    expect(LOADING_SAMPLE.length).toBeLessThanOrEqual(real.length * 1.2);
+  });
+
+  it("has no accessibility violations while loading", async () => {
+    const container = loading();
     await expectNoA11yViolations(container);
   });
 });
