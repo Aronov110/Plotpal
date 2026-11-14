@@ -99,11 +99,12 @@ opens its writing screen.
 
 - **Colours.** `apps/web/src/components/ions/tokens.css` holds every colour, size and motion value as a
   CSS variable; components read them and never hard-code a colour. Light is a warm paper palette,
-  dark is midnight. The page follows the system's setting by default. A **System / Light / Dark**
-  switch (header, login, sign-up and home screens) overrides it: the choice is one word,
-  `plotpal-theme`, in `localStorage` (a preference, never a token), and `public/theme-init.js` puts it
-  on the page before the first paint, so there is no flash of the wrong colours. The dark colours are
-  written twice (for a dark system and for a chosen dark): `tokens.test.ts` checks the contrast of
+  dark is midnight. Until a choice is made the page follows the device's setting, and the **Light /
+  Dark** switch (header, login, sign-up and home screens) shows that theme as the chosen one; the first
+  click saves a choice. The choice is one word, `plotpal-theme`, in `localStorage` (a preference, never
+  a token; any other stored value, such as an old `system`, is ignored), and `public/theme-init.js` puts
+  it on the page before the first paint, so there is no flash of the wrong colours. The dark colours are
+  written twice (for a dark device and for a chosen dark): `tokens.test.ts` checks the contrast of
   every colour pair in all three blocks, and that the two dark blocks are equal.
 - **Edges and dividers.** `--color-border` is strong enough to see (3:1, WCAG 1.4.11) and is for fields
   and buttons; `--color-divider` is a faint decoration for lines between areas and never the edge of

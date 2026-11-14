@@ -96,7 +96,7 @@ describe("SegmentedControl", () => {
       <SegmentedControl
         legend="Theme"
         options={[
-          { value: "system", label: "System" },
+          { value: "auto", label: "Auto" },
           { value: "light", label: "Light" },
           { value: "dark", label: "Dark" },
         ]}
