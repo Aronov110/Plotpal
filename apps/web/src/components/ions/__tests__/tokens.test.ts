@@ -197,7 +197,37 @@ describe("design tokens", () => {
     expect(tokensCss).toMatch(/\.visually-hidden\s*\{/);
   });
 
-  it("stops motion for people who ask for less of it", () => {
-    expect(tokensCss).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+  describe("motion for people who ask for less of it", () => {
+    const reduced =
+      /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*)\}\s*$/.exec(tokensCss)?.[1] ?? "";
+
+    it("has a rule for it, at the end of the file so that it wins", () => {
+      expect(reduced).not.toBe("");
+    });
+
+    it("makes animations and transitions end at once", () => {
+      expect(reduced).toMatch(/animation-duration:\s*0\.01ms/);
+      expect(reduced).toMatch(/transition-duration:\s*0\.01ms/);
+    });
+
+    it("also stops loops: a looping spinner at 0.01 ms a turn would flicker, not stand still", () => {
+      expect(reduced).toMatch(/animation-iteration-count:\s*1\s*!important/);
+    });
+
+    it("does not smooth-scroll", () => {
+      expect(reduced).toMatch(/scroll-behavior:\s*auto/);
+    });
+  });
+
+  describe("how screens arrive", () => {
+    it("has a fade-and-rise for the main part of a screen, from the motion tokens, on opacity and transform only", () => {
+      const rule = /\.page-enter\s*\{([^}]*)\}/.exec(tokensCss)?.[1] ?? "";
+      expect(rule).toContain("var(--duration-medium)");
+      expect(rule).toContain("var(--ease-out)");
+      const keyframes = /@keyframes page-enter\s*\{([\s\S]*?)\n\}/.exec(tokensCss)?.[1] ?? "";
+      expect(keyframes).toContain("opacity");
+      expect(keyframes).toContain("transform");
+      expect(keyframes).not.toMatch(/\b(width|height|top|left|margin)\b/);
+    });
   });
 });

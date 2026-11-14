@@ -3,9 +3,13 @@ import type { Project } from "../../../lib/api/projects-api.ts";
 import type { ProjectsView } from "../../../lib/projects/use-projects.ts";
 import { Button } from "../../atoms/Button/Button.tsx";
 import { ErrorSummary } from "../../molecules/ErrorSummary/ErrorSummary.tsx";
+import { LoadingState } from "../../molecules/LoadingState/LoadingState.tsx";
 import { projectItemId } from "../../molecules/ProjectListItem/ProjectListItem.tsx";
 import { ProjectEntry } from "../ProjectEntry/ProjectEntry.tsx";
 import "./ProjectList.css";
+
+/** Only the first screenful of cards comes in one after another; the rest come in together. */
+export const ENTER_LIMIT = 10;
 
 export interface ProjectListProps {
   readonly view: ProjectsView;
@@ -54,7 +58,7 @@ export function ProjectList({
   }, [items]);
 
   if (view.status === "loading") {
-    return <p role="status">Loading your projects…</p>;
+    return <LoadingState label="Loading your projects…" shape="cards" />;
   }
 
   if (view.status === "failed") {
@@ -93,9 +97,10 @@ export function ProjectList({
       ) : (
         // biome-ignore lint/a11y/noRedundantRoles: Safari drops the list meaning of a list with list-style: none
         <ul className="project-list" role="list">
-          {view.items.map((project) => (
+          {view.items.map((project, index) => (
             <ProjectEntry
               key={project.id}
+              enterIndex={index < ENTER_LIMIT ? index : 0}
               project={project}
               onSaved={onSaved}
               onUnchanged={onUnchanged}

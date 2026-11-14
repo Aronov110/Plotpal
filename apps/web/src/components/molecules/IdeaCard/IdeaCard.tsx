@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { Link } from "react-router";
 import { ideaKindLabel } from "../../../lib/analyses/analysis-feedback.ts";
 import type { Idea } from "../../../lib/api/analyses-api.ts";
@@ -14,6 +14,8 @@ export interface IdeaCardProps {
    * the focus into that item's text. The link itself already opens the item.
    */
   readonly onOpenItem: (id: string) => void;
+  /** Where it comes in the list, from 0: later cards rise in a little after earlier ones. */
+  readonly index?: number;
 }
 
 /**
@@ -21,11 +23,11 @@ export interface IdeaCardProps {
  * builds on, each marked as found in the writer's text or not) and where it could go. It is a
  * suggestion, not a fix, and the text is the AI's, so it is shown as plain text only.
  */
-export function IdeaCard({ idea, titles, onOpenItem }: IdeaCardProps): ReactElement {
+export function IdeaCard({ idea, titles, onOpenItem, index = 0 }: IdeaCardProps): ReactElement {
   // Only an item that is still in the outline can be linked to; the model's id is never trusted.
   const goesInTitle = idea.goesIn === null ? undefined : titles.get(idea.goesIn);
   return (
-    <li className="idea-card">
+    <li className="idea-card" style={{ "--enter-index": Math.min(index, 7) } as CSSProperties}>
       <h4 className="idea-card__title">{idea.title}</h4>
       <p className="idea-card__tags">
         <span className="idea-card__kind">{ideaKindLabel(idea.kind)}</span>

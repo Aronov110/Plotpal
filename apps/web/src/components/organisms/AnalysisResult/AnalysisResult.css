@@ -36,3 +36,18 @@
   border-left: 4px solid var(--color-danger);
   background: var(--color-danger-bg);
 }
+
+/* The result as a whole fades in, so that it does not just pop into the page. */
+.analysis-result {
+  animation: analysis-result-in var(--duration-medium) var(--ease-out) backwards;
+}
+
+@keyframes analysis-result-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

@@ -9,7 +9,7 @@ import "./CheckingSession.css";
  */
 export function CheckingSession(): ReactElement {
   return (
-    <main id="main-content" className="checking-session">
+    <main id="main-content" className="checking-session page-enter">
       <PageHeading>Plotpal</PageHeading>
       <p role="status">Checking your session…</p>
     </main>

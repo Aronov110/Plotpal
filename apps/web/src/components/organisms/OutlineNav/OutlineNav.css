@@ -53,3 +53,21 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
+
+/* Items come in one after another when the outline appears (the first ten; the rest at once). */
+.outline-nav__item {
+  animation: outline-nav-item-in var(--duration-medium) var(--ease-out) backwards;
+  animation-delay: calc(var(--enter-index, 0) * 30ms);
+}
+
+@keyframes outline-nav-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

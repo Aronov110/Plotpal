@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import {
   categoryLabel,
   severityLabel,
@@ -17,6 +17,8 @@ export interface FindingCardProps {
    * the focus into that item's text. The link itself already opens the item.
    */
   readonly onOpenItem: (id: string) => void;
+  /** Where it comes in the list, from 0: later cards rise in a little after earlier ones. */
+  readonly index?: number;
 }
 
 /**
@@ -25,9 +27,17 @@ export interface FindingCardProps {
  * text is the AI's, so it is shown as plain text only. Severity and the quote check are in words,
  * never only in colour. A passage in an item that is still in the outline links to that item.
  */
-export function FindingCard({ finding, titles, onOpenItem }: FindingCardProps): ReactElement {
+export function FindingCard({
+  finding,
+  titles,
+  onOpenItem,
+  index = 0,
+}: FindingCardProps): ReactElement {
   return (
-    <li className={`finding-card finding-card--${finding.severity}`}>
+    <li
+      className={`finding-card finding-card--${finding.severity}`}
+      style={{ "--enter-index": Math.min(index, 7) } as CSSProperties}
+    >
       <h4 className="finding-card__title">{finding.title}</h4>
       <p className="finding-card__tags">
         <span className="finding-card__severity" title={severityLabel(finding.severity)}>

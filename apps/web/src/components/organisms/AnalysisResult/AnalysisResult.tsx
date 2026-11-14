@@ -56,6 +56,7 @@ function PlotHolesBody({
               <FindingCard
                 // biome-ignore lint/suspicious/noArrayIndexKey: the findings never change after they are shown, and two may share a title
                 key={`${index}-${finding.title}`}
+                index={index}
                 finding={finding}
                 titles={titles}
                 onOpenItem={onOpenItem}
@@ -91,6 +92,7 @@ function IdeasBody({
               <IdeaCard
                 // biome-ignore lint/suspicious/noArrayIndexKey: the ideas never change after they are shown, and two may share a title
                 key={`${index}-${idea.title}`}
+                index={index}
                 idea={idea}
                 titles={titles}
                 onOpenItem={onOpenItem}

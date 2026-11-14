@@ -14,7 +14,7 @@ export interface AuthLayoutProps {
 /** The frame of the sign-up and login screens: a centered card under one heading. */
 export function AuthLayout({ title, footer, children }: AuthLayoutProps): ReactElement {
   return (
-    <main id="main-content" className="auth-layout">
+    <main id="main-content" className="auth-layout page-enter">
       <div className="auth-layout__tools">
         <ThemeSwitch />
       </div>

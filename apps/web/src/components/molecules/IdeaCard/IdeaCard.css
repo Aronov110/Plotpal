@@ -34,3 +34,21 @@
 .idea-card__goes-in {
   margin: 0 0 var(--space-2);
 }
+
+/* Cards rise in one after another when the result appears. "backwards": once in place, the animation lets go. */
+.idea-card {
+  animation: idea-card-in var(--duration-slow) var(--ease-out) backwards;
+  animation-delay: calc(var(--enter-index, 0) * 80ms);
+}
+
+@keyframes idea-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

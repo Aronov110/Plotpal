@@ -12,7 +12,7 @@ export function HomePage(): ReactElement {
   usePageTitle();
 
   return (
-    <main id="main-content" className="home-page">
+    <main id="main-content" className="home-page page-enter">
       <div className="home-page__tools">
         <ThemeSwitch />
       </div>

@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { expectNoPageA11yViolations } from "../../../../test-support/a11y.ts";
 import {
@@ -13,6 +14,7 @@ import {
   updated,
 } from "../../../../test-support/projects-handlers.ts";
 import { renderApp } from "../../../../test-support/render-app.tsx";
+import { deferred } from "../../../../test-support/session-harness.ts";
 import { projectItemId } from "../../../molecules/ProjectListItem/ProjectListItem.tsx";
 
 const HEADING = { level: 1, name: "Your projects" } as const;
@@ -82,17 +84,34 @@ describe("AppHomePage: the frame", () => {
 
 describe("AppHomePage: the list", () => {
   it("says that the projects are loading, then shows them", async () => {
-    answerProjectList(
-      projectPage([
-        makeProject({ title: "Lighthouse", format: "prose", logline: "A keeper finds a message." }),
-        makeProject({ title: "Night Shift" }),
-      ]),
-    );
+    // The answer is held back until the loading state has been looked at: a fast answer would take
+    // the state away before the test could check it.
+    const gate = deferred<Response>();
+    answerProjectList(() => gate.promise);
     renderApp({ route: "/app", signedIn: true });
 
-    expect(await screen.findByText("Loading your projects…")).toBeVisible();
+    expect(await screen.findByText("Loading your projects…")).toBeInTheDocument();
+    expect(document.querySelector(".skeleton--cards")).not.toBeNull();
+    expect(screen.getByText("Loading your projects…").closest("[role=status]")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+
+    gate.resolve(
+      HttpResponse.json(
+        projectPage([
+          makeProject({
+            title: "Lighthouse",
+            format: "prose",
+            logline: "A keeper finds a message.",
+          }),
+          makeProject({ title: "Night Shift" }),
+        ]),
+      ),
+    );
     expect(await screen.findByRole("heading", { level: 3, name: "Lighthouse" })).toBeVisible();
     expect(screen.queryByText("Loading your projects…")).not.toBeInTheDocument();
+    expect(document.querySelector(".skeleton")).toBeNull();
     expect(titlesShown()).toEqual(["Lighthouse", "Night Shift"]);
     expect(screen.getByText("A keeper finds a message.")).toBeVisible();
   });
