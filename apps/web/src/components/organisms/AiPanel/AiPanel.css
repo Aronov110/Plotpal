@@ -34,12 +34,44 @@
   margin: 0 0 var(--space-3);
 }
 
-.ai-panel__progress progress {
-  display: block;
-  width: 100%;
+/* A bar that slides to and fro while the AI works: the eye sees it, a screen reader has the real
+   progress bar above it. It stands still for people who ask for less movement. */
+.ai-panel__track {
+  position: relative;
+  height: 0.3rem;
   max-width: 24rem;
   margin-bottom: var(--space-2);
-  accent-color: var(--color-accent);
+  border-radius: 99px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.ai-panel__track::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: 99px;
+  background: var(--color-accent);
+  animation: ai-panel-slide 1.3s var(--ease-out) infinite;
+}
+
+@keyframes ai-panel-slide {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-panel__track::after {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
 }
 
 .ai-panel__progress p {

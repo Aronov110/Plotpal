@@ -1,14 +1,44 @@
+/* A card for each project: raised, with a soft edge, rising in when it appears (the first ten one
+   after another) and lifting a little under the pointer. */
 .project-item {
   margin: 0 0 var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-2);
   background: var(--color-surface);
+  box-shadow: var(--shadow-1);
   /* Titles and loglines are the person's own words: a very long one must wrap, not widen the page. */
   overflow-wrap: anywhere;
+  /* "backwards", not "both": once it has arrived the animation lets go, so the hover lift can apply. */
+  animation: project-item-in var(--duration-medium) var(--ease-out) backwards;
+  animation-delay: calc(var(--enter-index, 0) * 40ms);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-medium) var(--ease-out);
+}
+
+/* Only for a pointer that can hover: a touch screen has no hover, and a card the finger rests on
+   must not jump. */
+@media (hover: hover) {
+  .project-item:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+  }
 }
 
 /* The card gets the focus from code after "Load more" or a delete; it is not something to press, so no ring. */
 .project-item:focus {
   outline: none;
+}
+
+@keyframes project-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

@@ -111,8 +111,23 @@ opens its writing screen.
 - **Fonts.** Newsreader (headings, the writing area) and DM Sans (the interface), as variable fonts
   from the `@fontsource-variable` packages, served by this app itself: no request goes to another
   site. A normal English page loads about 95 KB of fonts.
-- **Motion.** Short transitions (150 to 500 ms) from the `--duration-*` and `--ease-out` tokens. A
-  system setting for less motion switches all of them off (`prefers-reduced-motion`).
+- **Motion.** Short transitions and animations (150 to 500 ms) from the `--duration-*` and `--ease-out`
+  tokens, on opacity and transform only. A system setting for less motion switches all of them off
+  (`prefers-reduced-motion`): durations end at once, loops (spinner, shimmer, progress) run once, there
+  is no smooth scrolling.
+  - **Screens fade in** (`.page-enter` on each screen's main part), also after Back, a redirect or a
+    reload.
+  - **No cross-fade between screens.** The browser's View Transition was tried and dropped: in WebKit it
+    lost text typed while the transition ran (a typed email vanished after Log in -> Create one), and it
+    crashed the page when the next screen changed a lot mid-transition. Links are plain links; the
+    fade-in above gives the same feel without that risk.
+  - **Loading shows a skeleton** (`LoadingState`: grey shapes in the size of what is coming, for the
+    eye; the same thing in words as a status, for a screen reader; the shapes are hidden from
+    assistive technology). It fades in after 150 ms, so a quick answer never shows it.
+  - **Lists settle in:** the first ten project cards, outline items and result cards come in one after
+    another (`--enter-index`, set in code, delayed in CSS); the rest come in together. Removed items
+    just disappear.
+  - **Project cards** lift a little under a pointer that can hover.
 - **Fields.** The text input, text area and select share one stylesheet
   (`atoms/TextInput/TextInput.css`): a strong 2px edge (3:1), a hover and a focus state (accent edge
   and a soft halo next to the focus ring), a red edge when invalid, and autofill repainted in the

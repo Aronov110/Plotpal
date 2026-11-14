@@ -1,0 +1,92 @@
+/* Grey shapes while something loads. They fade in after 150 ms, so an answer that comes quickly never
+   shows them at all (a flash of grey is worse than a short blank). */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  opacity: 0;
+  animation: skeleton-reveal var(--duration-medium) var(--ease-out) 150ms forwards;
+}
+
+.skeleton__bar,
+.skeleton__row {
+  display: block;
+  height: 0.875rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-divider) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s linear infinite;
+}
+
+/* Cards in the size of a project: a title and two lines. */
+.skeleton--cards {
+  gap: var(--space-3);
+}
+
+.skeleton__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-1);
+  background: var(--color-surface);
+}
+
+.skeleton__bar--title {
+  width: 40%;
+  height: 1.125rem;
+}
+
+/* An outline: an act, then its scenes indented under it. */
+.skeleton__row {
+  height: 1.5rem;
+  margin: var(--space-2) 0;
+}
+
+.skeleton__row--child {
+  margin-left: var(--space-4);
+  width: calc(70% - var(--space-4));
+}
+
+/* The paper of the editor: as tall as the writing area will be, so the page does not jump. */
+.skeleton--paper {
+  min-height: 34rem;
+  padding: var(--space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-2);
+  background: var(--color-surface);
+  gap: var(--space-3);
+}
+
+.skeleton__title {
+  width: 45%;
+  height: 2rem;
+  margin-bottom: var(--space-3);
+}
+
+@keyframes skeleton-reveal {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* No shimmer for people who ask for less movement: a plain, still shape. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__bar,
+  .skeleton__row {
+    background: var(--color-surface-2);
+    animation: none;
+  }
+}

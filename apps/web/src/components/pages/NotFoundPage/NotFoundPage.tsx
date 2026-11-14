@@ -9,7 +9,7 @@ export function NotFoundPage(): ReactElement {
   usePageTitle("Page not found");
 
   return (
-    <main id="main-content" className="not-found-page">
+    <main id="main-content" className="not-found-page page-enter">
       <PageHeading>Page not found</PageHeading>
       <p>That page does not exist, or it has moved.</p>
       <ButtonLink to="/">Go to the home page</ButtonLink>

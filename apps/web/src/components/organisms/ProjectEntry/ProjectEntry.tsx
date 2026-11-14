@@ -23,6 +23,8 @@ export interface ProjectEntryProps {
   readonly onUnchanged: () => void;
   /** Called once the project no longer exists. The list takes the card out and moves the focus. */
   readonly onDeleted: (project: Project) => void;
+  /** Where the card comes in the first screenful (see `ProjectListItem`). */
+  readonly enterIndex?: number;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ProjectEntry({
   onSaved,
   onUnchanged,
   onDeleted,
+  enterIndex = 0,
 }: ProjectEntryProps): ReactElement {
   const [mode, setMode] = useState<Mode>("viewing");
   const editRef = useRef<HTMLButtonElement | null>(null);
@@ -64,7 +67,7 @@ export function ProjectEntry({
 
   if (mode === "editing") {
     return (
-      <ProjectListItem projectId={project.id}>
+      <ProjectListItem projectId={project.id} enterIndex={enterIndex}>
         <EditProjectForm
           project={project}
           onSaved={(saved) => {
@@ -84,7 +87,7 @@ export function ProjectEntry({
   }
 
   return (
-    <ProjectListItem projectId={project.id}>
+    <ProjectListItem projectId={project.id} enterIndex={enterIndex}>
       <ProjectSummary project={project} to={writingPath(project.id)} />
       {mode === "confirming-delete" ? (
         <DeleteConfirmation

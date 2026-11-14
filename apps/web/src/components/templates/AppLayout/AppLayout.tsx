@@ -60,7 +60,11 @@ export function AppLayout({
       </header>
       <main
         id="main-content"
-        className={wide ? "app-layout__main app-layout__main--wide" : "app-layout__main"}
+        className={
+          wide
+            ? "app-layout__main app-layout__main--wide page-enter"
+            : "app-layout__main page-enter"
+        }
         tabIndex={-1}
       >
         {children}

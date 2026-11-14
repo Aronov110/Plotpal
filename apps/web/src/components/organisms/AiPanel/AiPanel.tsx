@@ -14,6 +14,7 @@ import { AiPrivacyNotice } from "../../molecules/AiPrivacyNotice/AiPrivacyNotice
 import { CostHint } from "../../molecules/CostHint/CostHint.tsx";
 import { DeleteConfirmation } from "../../molecules/DeleteConfirmation/DeleteConfirmation.tsx";
 import { FocusField } from "../../molecules/FocusField/FocusField.tsx";
+import { LoadingState } from "../../molecules/LoadingState/LoadingState.tsx";
 import { Notice } from "../../molecules/Notice/Notice.tsx";
 import { ScopeChoice, type ScopeValue } from "../../molecules/ScopeChoice/ScopeChoice.tsx";
 import {
@@ -100,7 +101,9 @@ function Progress({ analysis, trouble }: { analysis: Analysis; trouble: boolean 
   const words = WORDS[analysis.kind];
   return (
     <div className="ai-panel__progress">
-      <progress aria-label={words.progress} />
+      {/* The real progress bar is for screen readers; the moving bar under it is what the eye sees. */}
+      <progress className="visually-hidden" aria-label={words.progress} />
+      <div className="ai-panel__track" aria-hidden="true" />
       <p>
         Reading your text…{seconds === undefined ? "" : ` ${seconds} s.`} This usually takes a
         minute or two, and longer for a long project. You can keep writing.
@@ -269,7 +272,9 @@ export function AiPanel({
           <h3 id={`${ids}-history`} tabIndex={-1} ref={historyHeadingRef}>
             Earlier results
           </h3>
-          {history.status === "loading" ? <p role="status">Loading your earlier results…</p> : null}
+          {history.status === "loading" ? (
+            <LoadingState label="Loading your earlier results…" shape="lines" count={2} />
+          ) : null}
           {history.status === "failed" ? (
             <div className="ai-panel__problem">
               <p>{history.message}</p>

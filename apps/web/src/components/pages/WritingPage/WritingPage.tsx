@@ -8,6 +8,7 @@ import { Button } from "../../atoms/Button/Button.tsx";
 import { PageHeading } from "../../atoms/PageHeading/PageHeading.tsx";
 import { Drawer } from "../../molecules/Drawer/Drawer.tsx";
 import { ErrorSummary } from "../../molecules/ErrorSummary/ErrorSummary.tsx";
+import { LoadingState } from "../../molecules/LoadingState/LoadingState.tsx";
 import { AddItemForm } from "../../organisms/AddItemForm/AddItemForm.tsx";
 import { AiPanel } from "../../organisms/AiPanel/AiPanel.tsx";
 import { DocumentEditor } from "../../organisms/DocumentEditor/DocumentEditor.tsx";
@@ -139,7 +140,7 @@ export function WritingPage(): ReactElement {
 
   let side: ReactElement;
   if (outline.view.status === "loading") {
-    side = <p role="status">Loading the outline…</p>;
+    side = <LoadingState label="Loading the outline…" shape="outline" />;
   } else if (outline.view.status === "failed") {
     side = (
       <div className="writing-page__problem">

@@ -9,6 +9,7 @@ import type { OutlineNode } from "../../../lib/documents/use-outline.ts";
 import { Button } from "../../atoms/Button/Button.tsx";
 import { ConflictNotice } from "../../molecules/ConflictNotice/ConflictNotice.tsx";
 import { ErrorSummary } from "../../molecules/ErrorSummary/ErrorSummary.tsx";
+import { LoadingState } from "../../molecules/LoadingState/LoadingState.tsx";
 import { SaveStatus } from "../../molecules/SaveStatus/SaveStatus.tsx";
 import { ItemToolbar } from "../ItemToolbar/ItemToolbar.tsx";
 import "./DocumentEditor.css";
@@ -67,7 +68,7 @@ export function DocumentEditor({
   const { load } = editor;
 
   if (load.status === "loading") {
-    return <p role="status">Loading the text…</p>;
+    return <LoadingState label="Loading the text…" shape="paper" />;
   }
 
   if (load.status === "failed") {

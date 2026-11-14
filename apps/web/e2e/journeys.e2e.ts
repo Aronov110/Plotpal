@@ -82,6 +82,11 @@ test.describe("signing up, staying signed in, signing out and signing in", () =>
     await expect(page).toHaveURL(/\/login$/);
     await page.getByRole("link", { name: "Create one" }).click();
     await expect(page).toHaveURL(/\/register$/);
+    // The address changes a moment before the new screen is drawn; text typed into the old login
+    // form in between is thrown away with it. Wait for the sign-up screen itself.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Create your account" }),
+    ).toBeVisible();
     await submitSignUpForm(page, user);
     await expect(page).toHaveURL(/\/app$/);
   });
