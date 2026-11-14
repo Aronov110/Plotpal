@@ -39,7 +39,12 @@ export function AddItemForm({ projectId, inside, onAdded }: AddItemFormProps): R
           id={titleId}
           name="title"
           label="Title"
-          hint="The name of the new act, chapter or scene."
+          // Only what can be added: with no act or chapter open there is no place for a scene.
+          hint={
+            inside === undefined
+              ? "The name of the new act or chapter."
+              : "The name of the new scene, act or chapter."
+          }
           autoComplete="off"
           error={form.titleError}
         />
