@@ -21,6 +21,11 @@ describe("loadEnv", () => {
       CORS_ORIGINS: ["http://127.0.0.1:5173", "http://localhost:5173"],
       RATE_LIMIT_MAX: 100,
       RATE_LIMIT_WINDOW_SECONDS: 60,
+      TRUST_PROXY: 0,
+      DOCS_ENABLED: true,
+      DATABASE_SSL: "off",
+      DATABASE_SSL_CA: undefined,
+      DATABASE_POOL_MAX: 10,
       ANTHROPIC_API_KEY: undefined,
       AI_ENABLED: true,
       AI_MODEL: "claude-opus-5-5",
@@ -435,6 +440,10 @@ describe("loadDatabaseEnv", () => {
     expect(loadDatabaseEnv({ NODE_ENV: "development", DATABASE_URL: validDatabaseUrl })).toEqual({
       NODE_ENV: "development",
       DATABASE_URL: validDatabaseUrl,
+      // The database settings with a default, which are not required.
+      DATABASE_SSL: "off",
+      DATABASE_SSL_CA: undefined,
+      DATABASE_POOL_MAX: 10,
     });
   });
 

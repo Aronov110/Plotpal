@@ -1,0 +1,20 @@
+# What goes into the image build. The rule is "nothing, except what is named": a new file or folder
+# (a .env with a password, test data, notes) can never get in by accident. Rules are read in order and
+# a later one wins, which is why the tests are left out again at the end.
+
+*
+
+# The install step needs the manifests and the lock file (the lock file covers the whole workspace).
+!package.json
+!bun.lock
+!apps/api/package.json
+!apps/web/package.json
+
+# What the API runs: its source and its migrations.
+!apps/api/src
+!apps/api/drizzle
+
+# ...but not its tests or their helpers.
+**/__tests__
+**/test-support
+**/*.test.ts

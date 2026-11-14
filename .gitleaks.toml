@@ -1,0 +1,19 @@
+# Settings for gitleaks (https://github.com/gitleaks/gitleaks), the secret scanner. Run it before a push:
+#   gitleaks git . --redact          (everything ever committed)
+#   gitleaks dir . --redact          (the files as they are now; also reads the local, ignored .env)
+
+[extend]
+# Everything gitleaks knows by default stays on.
+useDefault = true
+
+[allowlist]
+description = "Made-up values that only the tests use"
+# Exact values, not whole folders: a real secret in a test file would still be found.
+regexes = [
+  # The signing secret of the unit and integration tests (keyboard-pattern, not used anywhere real).
+  '''k3Y7mQ2vX9bR5tN8wZ1cL6hD4fJ0sA3gUe7Pq2OxVn8Rb5Tm''',
+  # A second made-up secret, for "a token signed with another secret" tests.
+  '''Zx9Wv8Ut7Sr6Qp5On4Ml3Kj2Ih1Gf0Ed9Cb8Ba7Zy6Xw5Vu4Ts3Rq''',
+  # A made-up token hash.
+  '''0123456789abcdef''',
+]

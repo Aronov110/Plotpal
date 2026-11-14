@@ -32,7 +32,93 @@ const databaseUrlSchema = z
   .url()
   .refine((value) => /^postgres(ql)?:\/\//.test(value), {
     message: "DATABASE_URL must start with postgres:// or postgresql://",
-  });
+  })
+  // The driver lets settings in the address override the ones the app passes, so a copied-in
+  // `?sslmode=...` would quietly change how the connection is secured. There is one way to set it.
+  .refine(
+    (value) => {
+      try {
+        return ![...new URL(value).searchParams.keys()].some((key) =>
+          key.toLowerCase().startsWith("ssl"),
+        );
+      } catch {
+        return true;
+      }
+    },
+    {
+      message:
+        "DATABASE_URL must not carry ssl settings (sslmode, ssl, ...); use DATABASE_SSL and DATABASE_SSL_CA",
+    },
+  );
+
+/** Whole numbers only: no coercion, so an empty value is refused instead of becoming 0. */
+function wholeNumber(name: string, fallback: string, min: number, max: number) {
+  return z
+    .string()
+    .regex(/^\d+$/, `${name} must be a whole number`)
+    .default(fallback)
+    .transform(Number)
+    .pipe(
+      z
+        .number()
+        .int()
+        .min(min, `${name} must be at least ${min}`)
+        .max(max, `${name} must be at most ${max}`),
+    );
+}
+
+/** Whether the connection to the database is encrypted. Supabase only talks encrypted. */
+const databaseSslSchema = z
+  .enum(["off", "on"], { error: "DATABASE_SSL must be off or on" })
+  .default("off");
+
+const PEM_CERTIFICATE = /^\s*-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----\s*$/;
+
+/**
+ * The certificate authority that signed the database's certificate, as pasted text. A secret
+ * manager often keeps new lines as the two characters backslash and n, so those are turned back.
+ * An empty value counts as none.
+ */
+const databaseSslCaSchema = z
+  .string()
+  .optional()
+  .transform((value) =>
+    value === undefined || value === "" ? undefined : value.replaceAll("\\n", "\n"),
+  )
+  .pipe(
+    z
+      .string()
+      .refine((value) => PEM_CERTIFICATE.test(value), {
+        message: "DATABASE_SSL_CA must be a PEM certificate (-----BEGIN CERTIFICATE-----)",
+      })
+      .optional(),
+  );
+
+const databaseSettings = {
+  DATABASE_URL: databaseUrlSchema,
+  DATABASE_SSL: databaseSslSchema,
+  DATABASE_SSL_CA: databaseSslCaSchema,
+  /** How many connections the API may open at most. */
+  DATABASE_POOL_MAX: wholeNumber("DATABASE_POOL_MAX", "10", 1, 50),
+};
+
+interface IssueSink {
+  addIssue: (issue: { code: "custom"; path: string[]; message: string }) => void;
+}
+
+/** A certificate with TLS off would be ignored without a word, so it is refused. */
+function checkSslPair(
+  value: { DATABASE_SSL: "off" | "on"; DATABASE_SSL_CA?: string | undefined },
+  ctx: IssueSink,
+): void {
+  if (value.DATABASE_SSL === "off" && value.DATABASE_SSL_CA !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["DATABASE_SSL_CA"],
+      message: "DATABASE_SSL_CA is only used with DATABASE_SSL=on",
+    });
+  }
+}
 
 /** The value `.env.example` ships with. It must never be used for real. */
 const SECRET_PLACEHOLDER_PREFIX = "change-me";
@@ -91,7 +177,7 @@ const envSchema = z
     NODE_ENV: nodeEnvSchema,
     API_HOST: z.string().min(1).default("127.0.0.1"),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-    DATABASE_URL: databaseUrlSchema,
+    ...databaseSettings,
     JWT_ACCESS_SECRET: jwtSecretSchema,
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
@@ -105,6 +191,16 @@ const envSchema = z
     CORS_ORIGINS: z.string().optional(),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(100_000).default(100),
     RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(60),
+    /**
+     * How many proxies stand between a visitor and this API (on Fly behind Vercel: 2). The API reads
+     * the visitor's address from that many hops of `X-Forwarded-For`, counted from the right, so
+     * an address the visitor makes up on the left is never believed. 0 means the connection itself.
+     */
+    TRUST_PROXY: wholeNumber("TRUST_PROXY", "0", 0, 10),
+    /** The /docs page and the API description. Off by default in production. */
+    DOCS_ENABLED: z
+      .enum(["true", "false"], { error: "DOCS_ENABLED must be true or false" })
+      .optional(),
     // The AI features (plot-hole finder, idea generator). Off when there is no key.
     ANTHROPIC_API_KEY: anthropicApiKeySchema,
     /** A kill switch: `false` switches the AI features off even when a key is set. */
@@ -129,8 +225,9 @@ const envSchema = z
     AI_REQUEST_TIMEOUT_SECONDS: z.coerce.number().int().min(30).max(1800).default(600),
   })
   .transform((raw, ctx) => {
-    const { CORS_ORIGINS: rawOrigins, ...rest } = raw;
+    const { CORS_ORIGINS: rawOrigins, DOCS_ENABLED: rawDocs, ...rest } = raw;
     let corsOrigins: readonly string[] = DEFAULT_DEV_CORS_ORIGINS;
+    checkSslPair(rest, ctx);
 
     // The placeholder is public (it is in .env.example), so a server using it has forgeable
     // tokens. Only the test suite may use it. A staging copy started with NODE_ENV=development
@@ -181,12 +278,17 @@ const envSchema = z
       return z.NEVER;
     }
 
-    return { ...rest, CORS_ORIGINS: corsOrigins };
+    const docsEnabled = rawDocs === undefined ? rest.NODE_ENV !== "production" : rawDocs === "true";
+    return { ...rest, CORS_ORIGINS: corsOrigins, DOCS_ENABLED: docsEnabled };
   });
 
 export type Env = z.infer<typeof envSchema>;
 
-const databaseEnvSchema = z.object({ NODE_ENV: nodeEnvSchema, DATABASE_URL: databaseUrlSchema });
+const databaseEnvSchema = z
+  .object({ NODE_ENV: nodeEnvSchema, ...databaseSettings })
+  .superRefine((value, ctx) => {
+    checkSslPair(value, ctx);
+  });
 
 export type DatabaseEnv = z.infer<typeof databaseEnvSchema>;
 

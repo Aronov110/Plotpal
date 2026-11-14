@@ -1,9 +1,9 @@
 import { loadDatabaseEnv } from "../config/env.ts";
-import { createDatabase } from "./client.ts";
+import { createDatabase, databaseOptions } from "./client.ts";
 import { runMigrations } from "./migrate.ts";
 
 const env = loadDatabaseEnv(process.env);
-const { db, close } = createDatabase(env.DATABASE_URL);
+const { db, close } = createDatabase(env.DATABASE_URL, databaseOptions(env));
 
 try {
   await runMigrations(db);
