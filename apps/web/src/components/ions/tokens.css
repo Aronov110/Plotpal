@@ -2,7 +2,7 @@
  *
  * Light colors are warm paper; dark colors are midnight. Three blocks hold the colors:
  *   1. :root                                      the light colors (and the default)
- *   2. @media dark, :root:not([data-theme=light]) the dark colors when the system prefers dark,
+ *   2. @media dark, :root:not([data-theme=light]) the dark colors when the device prefers dark,
  *                                                  unless the person chose light
  *   3. :root[data-theme="dark"]                    the same dark colors for a person who chose dark
  * tokens.test.ts checks the contrast of every pair in all three, and that blocks 2 and 3 are equal.

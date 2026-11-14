@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   applyPreference,
+  deviceTheme,
   isThemePreference,
   readPreference,
   THEME_STORAGE_KEY,
@@ -22,45 +23,86 @@ function fakeStorage(initial: Record<string, string> = {}) {
 }
 
 describe("isThemePreference", () => {
-  it.each(["system", "light", "dark"])("accepts %s", (value) => {
+  it.each(["light", "dark"])("accepts %s", (value) => {
     expect(isThemePreference(value)).toBe(true);
   });
 
-  it.each([null, undefined, "", "LIGHT", "Dark", "auto", "constructor", "__proto__", 1, {}])(
-    "refuses %j",
-    (value) => {
-      expect(isThemePreference(value)).toBe(false);
-    },
-  );
+  it.each([
+    null,
+    undefined,
+    "",
+    "system",
+    "LIGHT",
+    "Dark",
+    "auto",
+    "constructor",
+    "__proto__",
+    1,
+    {},
+  ])("refuses %j", (value) => {
+    expect(isThemePreference(value)).toBe(false);
+  });
 });
 
 describe("readPreference", () => {
-  it("is system when nothing was saved", () => {
-    expect(readPreference(fakeStorage())).toBe("system");
+  it("is nothing when nothing was saved", () => {
+    expect(readPreference(fakeStorage())).toBeUndefined();
   });
 
-  it.each(["light", "dark", "system"] as const)("gives back a saved %s", (value) => {
+  it.each(["light", "dark"] as const)("gives back a saved %s", (value) => {
     expect(readPreference(fakeStorage({ [THEME_STORAGE_KEY]: value }))).toBe(value);
   });
 
-  it.each(["bogus", "", "LIGHT", "{}", "null", "constructor"])(
-    "is system for a saved value that means nothing (%j)",
+  it.each(["system", "bogus", "", "LIGHT", "{}", "null", "constructor"])(
+    "is nothing for a saved value that means nothing (%j)",
     (value) => {
-      expect(readPreference(fakeStorage({ [THEME_STORAGE_KEY]: value }))).toBe("system");
+      expect(readPreference(fakeStorage({ [THEME_STORAGE_KEY]: value }))).toBeUndefined();
     },
   );
 
-  it("is system when there is no storage at all", () => {
-    expect(readPreference(undefined)).toBe("system");
+  it("is nothing when there is no storage at all", () => {
+    expect(readPreference(undefined)).toBeUndefined();
   });
 
-  it("is system when reading the storage throws (blocked storage)", () => {
+  it("is nothing when reading the storage throws (blocked storage)", () => {
     const blocked = {
       getItem: () => {
         throw new DOMException("denied", "SecurityError");
       },
     };
-    expect(readPreference(blocked)).toBe("system");
+    expect(readPreference(blocked)).toBeUndefined();
+  });
+});
+
+describe("deviceTheme", () => {
+  const answer = (matches: boolean) => (query: string) => ({
+    matches: query.includes("dark") && matches,
+  });
+
+  it("is dark when the device prefers dark", () => {
+    expect(deviceTheme(answer(true))).toBe("dark");
+  });
+
+  it("is light when the device does not prefer dark", () => {
+    expect(deviceTheme(answer(false))).toBe("light");
+  });
+
+  it("asks about the dark colour scheme", () => {
+    const ask = vi.fn(() => ({ matches: false }));
+    deviceTheme(ask);
+    expect(ask).toHaveBeenCalledWith("(prefers-color-scheme: dark)");
+  });
+
+  it("is light when the browser cannot be asked", () => {
+    expect(deviceTheme(undefined)).toBe("light");
+  });
+
+  it("is light when asking throws", () => {
+    expect(
+      deviceTheme(() => {
+        throw new Error("no");
+      }),
+    ).toBe("light");
   });
 });
 
@@ -71,12 +113,6 @@ describe("writePreference", () => {
     expect(storage.data.get(THEME_STORAGE_KEY)).toBe(value);
   });
 
-  it("forgets the saved value for system, which is the default", () => {
-    const storage = fakeStorage({ [THEME_STORAGE_KEY]: "dark" });
-    writePreference("system", storage);
-    expect(storage.data.has(THEME_STORAGE_KEY)).toBe(false);
-  });
-
   it("does not fail when the storage is missing or blocked", () => {
     expect(() => {
       writePreference("dark", undefined);
@@ -85,13 +121,9 @@ describe("writePreference", () => {
       setItem: vi.fn(() => {
         throw new DOMException("full", "QuotaExceededError");
       }),
-      removeItem: vi.fn(() => {
-        throw new DOMException("full", "QuotaExceededError");
-      }),
     };
     expect(() => {
       writePreference("dark", blocked);
-      writePreference("system", blocked);
     }).not.toThrow();
   });
 
@@ -109,10 +141,10 @@ describe("applyPreference", () => {
     expect(root.getAttribute("data-theme")).toBe(value);
   });
 
-  it("removes the mark for system, so the system's own setting decides", () => {
+  it("removes the mark when nothing is chosen, so the device's own setting decides", () => {
     const root = document.createElement("html");
     root.setAttribute("data-theme", "dark");
-    applyPreference("system", root);
+    applyPreference(undefined, root);
     expect(root.hasAttribute("data-theme")).toBe(false);
   });
 
@@ -126,7 +158,7 @@ describe("applyPreference", () => {
   it("uses the page's own root element when none is given", () => {
     applyPreference("dark");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-    applyPreference("system");
+    applyPreference(undefined);
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
 });

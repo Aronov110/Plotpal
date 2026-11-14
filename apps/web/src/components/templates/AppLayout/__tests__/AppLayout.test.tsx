@@ -100,11 +100,11 @@ describe("AppLayout", () => {
   });
 
   describe("the colour theme", () => {
-    it("offers a choice of system, light and dark in the header", async () => {
+    it("offers a choice of light and dark in the header", async () => {
       await renderLayout();
       const header = screen.getByRole("banner");
       const group = within(header).getByRole("group", { name: "Colour theme" });
-      expect(within(group).getAllByRole("radio")).toHaveLength(3);
+      expect(within(group).getAllByRole("radio")).toHaveLength(2);
     });
 
     it("puts the chosen theme on the page", async () => {
