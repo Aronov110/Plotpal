@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +10,7 @@ import {
   makeFinding,
   makeSucceeded,
 } from "../../../../test-support/analyses-handlers.ts";
-import { AnalysisResult } from "../AnalysisResult.tsx";
+import { AnalysisResult, type AnalysisResultProps } from "../AnalysisResult.tsx";
 
 const TITLES = new Map([["doc-1", "The harbour"]]);
 
@@ -148,5 +148,65 @@ describe("AnalysisResult", () => {
     await expectNoA11yViolations(container);
     const failed = renderResult(makeFailed("refused"));
     await expectNoA11yViolations(failed.container);
+  });
+});
+
+describe("AnalysisResult: deleting from the top", () => {
+  function renderWith(extra: Partial<AnalysisResultProps>) {
+    return render(
+      <MemoryRouter>
+        <AnalysisResult
+          analysis={makeSucceeded([])}
+          titles={TITLES}
+          onClose={() => undefined}
+          onOpenItem={() => undefined}
+          {...extra}
+        />
+      </MemoryRouter>,
+    );
+  }
+
+  const top = (): HTMLElement => {
+    const element = screen.getByRole("heading", { level: 3 }).closest(".analysis-result__top");
+    if (!(element instanceof HTMLElement)) throw new Error("no top part");
+    return element;
+  };
+
+  it("has no Delete button when nobody can delete it", () => {
+    renderWith({});
+    expect(screen.queryByRole("button", { name: /Delete/ })).not.toBeInTheDocument();
+  });
+
+  it("puts Delete next to Close at the top, named for the result", () => {
+    renderWith({ onDelete: () => undefined, deleteLabel: "Delete the scan of the whole project" });
+    expect(within(top()).getByRole("button", { name: "Close this result" })).toBeVisible();
+    expect(
+      within(top()).getByRole("button", { name: "Delete the scan of the whole project" }),
+    ).toBeVisible();
+    expect(within(top()).getByRole("button", { name: /Delete/ })).toHaveTextContent("Delete");
+  });
+
+  it("asks to delete when the button is pressed", async () => {
+    const onDelete = vi.fn();
+    renderWith({ onDelete, deleteLabel: "Delete the scan" });
+    await userEvent.click(screen.getByRole("button", { name: "Delete the scan" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands its Delete button to the panel, so that focus can come back to it", () => {
+    const deleteRef = { current: null as HTMLButtonElement | null };
+    renderWith({ onDelete: () => undefined, deleteLabel: "Delete the scan", deleteRef });
+    expect(deleteRef.current).toBe(screen.getByRole("button", { name: "Delete the scan" }));
+  });
+
+  it("shows a question under the buttons, not among them", () => {
+    renderWith({
+      onDelete: () => undefined,
+      deleteLabel: "Delete the scan",
+      confirmation: <p>Are you sure?</p>,
+    });
+    const question = screen.getByText("Are you sure?");
+    expect(top()).not.toContainElement(question);
+    expect(top().compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

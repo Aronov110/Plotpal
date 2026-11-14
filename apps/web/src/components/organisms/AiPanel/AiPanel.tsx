@@ -95,6 +95,12 @@ const MODES: readonly SegmentedOption<AnalysisKind>[] = [
   },
 ];
 
+/** How a run is named in a button or a question: "scan of “The harbour”, 10 Nov 09:00". */
+function describeRun(analysis: Analysis, titles: ReadonlyMap<string, string>): string {
+  const when = formatRunTime(analysis.createdAt) ?? "an unknown time";
+  return `${WORDS[analysis.kind].of} ${describeScope(analysis, titles)}, ${when}`;
+}
+
 /** Shows how long a run has been going. The text is not a live region, so it is not read out. */
 function Progress({ analysis, trouble }: { analysis: Analysis; trouble: boolean }): ReactElement {
   const seconds = useElapsedSeconds(analysis.createdAt, true);
@@ -168,6 +174,11 @@ export function AiPanel({
   const focusResult = useRef(false);
   const historyHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const keepRef = useRef<HTMLButtonElement | null>(null);
+  // The Open button of each row, by the id of its result, and the Delete button at the top of the
+  // open result: the focus goes back to them when the result is closed or its question is answered.
+  const openButtons = useRef(new Map<string, HTMLButtonElement>());
+  const deleteTopRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusTo = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (focusResult.current && run.phase === "finished") {
@@ -180,10 +191,36 @@ export function AiPanel({
     if (confirming !== undefined) keepRef.current?.focus();
   }, [confirming]);
 
+  // After a result is closed, the focus returns to its row's Open button (or the list's heading when
+  // the row is not in the list, say because it is on an older page).
+  useEffect(() => {
+    const id = returnFocusTo.current;
+    if (id === undefined || run.phase !== "idle") return;
+    returnFocusTo.current = undefined;
+    (openButtons.current.get(id) ?? historyHeadingRef.current)?.focus();
+  }, [run]);
+
   const openFromHistory = (analysis: Analysis): void => {
     focusResult.current = true;
+    setConfirming(undefined);
     panel.openRun(analysis);
   };
+
+  const closeResult = (): void => {
+    if (run.phase === "finished") returnFocusTo.current = run.analysis.id;
+    setConfirming(undefined);
+    panel.dismiss();
+  };
+
+  const keepResult = (): void => {
+    setConfirming(undefined);
+    deleteTopRef.current?.focus();
+  };
+
+  // The result on screen is not in the list; it goes back when it is closed.
+  const shown = run.phase === "finished" ? run.analysis : undefined;
+  const rows =
+    history.status === "ready" ? history.items.filter((item) => item.id !== shown?.id) : [];
 
   const confirmDelete = (analysis: Analysis): void => {
     setConfirming(undefined);
@@ -258,12 +295,33 @@ export function AiPanel({
           <Progress analysis={run.analysis} trouble={run.trouble} />
         ) : null}
 
-        {run.phase === "finished" ? (
+        {shown !== undefined ? (
           <AnalysisResult
-            analysis={run.analysis}
+            analysis={shown}
             titles={titles}
             headingRef={resultHeadingRef}
-            onClose={panel.dismiss}
+            onClose={closeResult}
+            onDelete={() => {
+              setConfirming(shown.id);
+            }}
+            deleteLabel={`Delete the ${describeRun(shown, titles)}`}
+            deleteRef={deleteTopRef}
+            confirmation={
+              confirming === shown.id ? (
+                <DeleteConfirmation
+                  title={describeRun(shown, titles)}
+                  noun={WORDS[shown.kind].noun}
+                  consequence={WORDS[shown.kind].lost}
+                  busy={false}
+                  error={undefined}
+                  keepRef={keepRef}
+                  onConfirm={() => {
+                    confirmDelete(shown);
+                  }}
+                  onCancel={keepResult}
+                />
+              ) : null
+            }
             onOpenItem={onOpenItem}
           />
         ) : null}
@@ -288,58 +346,68 @@ export function AiPanel({
           ) : null}
           {history.status === "ready" && history.items.length > 0 ? (
             <>
-              <ul className="ai-panel__runs">
-                {history.items.map((analysis) => {
-                  const when = formatRunTime(analysis.createdAt) ?? "an unknown time";
-                  const what = describeScope(analysis, titles);
-                  const label = `${what}, ${when}`;
-                  const rowWords = WORDS[analysis.kind];
-                  return (
-                    <li key={analysis.id} className="ai-panel__run">
-                      <p className="ai-panel__run-text">
-                        {when}: {kindWord(analysis.kind)}, {what}, {statusWord(analysis)}
-                      </p>
-                      <div className="ai-panel__run-buttons">
-                        <Button
-                          variant="secondary"
-                          aria-label={`${analysis.status === "pending" ? "Watch" : "Open"} the ${rowWords.of} ${label}`}
-                          onClick={() => {
-                            openFromHistory(analysis);
-                          }}
-                        >
-                          {analysis.status === "pending" ? "Watch" : "Open"}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          aria-label={`Delete the ${rowWords.of} ${label}`}
-                          onClick={() => {
-                            setConfirming(analysis.id);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                      {confirming === analysis.id ? (
-                        <DeleteConfirmation
-                          title={`${rowWords.of} ${label}`}
-                          noun={rowWords.noun}
-                          consequence={rowWords.lost}
-                          busy={false}
-                          error={undefined}
-                          keepRef={keepRef}
-                          onConfirm={() => {
-                            confirmDelete(analysis);
-                          }}
-                          onCancel={() => {
-                            setConfirming(undefined);
-                          }}
-                        />
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-              {history.nextCursor === null ? null : (
+              {rows.length === 0 ? null : (
+                <ul className="ai-panel__runs">
+                  {rows.map((analysis) => {
+                    const when = formatRunTime(analysis.createdAt) ?? "an unknown time";
+                    const what = describeScope(analysis, titles);
+                    const label = `${what}, ${when}`;
+                    const rowWords = WORDS[analysis.kind];
+                    return (
+                      <li key={analysis.id} className="ai-panel__run">
+                        <p className="ai-panel__run-text">
+                          {when}: {kindWord(analysis.kind)}, {what}, {statusWord(analysis)}
+                        </p>
+                        <div className="ai-panel__run-buttons">
+                          <Button
+                            variant="secondary"
+                            ref={(element) => {
+                              if (element === null) openButtons.current.delete(analysis.id);
+                              else openButtons.current.set(analysis.id, element);
+                            }}
+                            aria-label={`${analysis.status === "pending" ? "Watch" : "Open"} the ${rowWords.of} ${label}`}
+                            onClick={() => {
+                              openFromHistory(analysis);
+                            }}
+                          >
+                            {analysis.status === "pending" ? "Watch" : "Open"}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            aria-label={`Delete the ${rowWords.of} ${label}`}
+                            onClick={() => {
+                              setConfirming(analysis.id);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                        {confirming === analysis.id ? (
+                          <DeleteConfirmation
+                            title={`${rowWords.of} ${label}`}
+                            noun={rowWords.noun}
+                            consequence={rowWords.lost}
+                            busy={false}
+                            error={undefined}
+                            keepRef={keepRef}
+                            onConfirm={() => {
+                              confirmDelete(analysis);
+                            }}
+                            onCancel={() => {
+                              setConfirming(undefined);
+                            }}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {history.nextCursor === null ? (
+                rows.length === 0 ? (
+                  <p className="ai-panel__empty">No other earlier results.</p>
+                ) : null
+              ) : (
                 <Button variant="secondary" busy={history.loadingMore} onClick={panel.loadMore}>
                   {history.loadingMore ? "Loading…" : "Show older results"}
                 </Button>

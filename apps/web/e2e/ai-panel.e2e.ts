@@ -210,3 +210,150 @@ test.describe("the plot-hole finder", () => {
     await expectNoAxeViolations(page);
   });
 });
+
+test.describe("an opened result leaves the list of earlier results", () => {
+  test.afterEach(async ({ request }) => {
+    await releaseAi(request);
+  });
+
+  const rows = (page: Page) => page.locator(".ai-panel__run");
+  const topOfResult = (page: Page) => page.locator(".analysis-result__top");
+
+  /** Two finished scans in the history, the panel open and no result shown. */
+  async function withTwoEarlierResults(page: Page, request: Parameters<typeof createAccount>[0]) {
+    await openStory(page, request);
+    await toggle(page).click();
+    for (let run = 0; run < 2; run += 1) {
+      await runButton(page).click();
+      await expect(findings(page)).toBeVisible({ timeout: RESULT_TIMEOUT });
+      await page.getByRole("button", { name: "Close this result" }).click();
+    }
+    await page.reload();
+    await toggle(page).click();
+    await expect(rows(page)).toHaveCount(2);
+  }
+
+  test("Open takes the row out of the list and puts Delete beside Close; Close puts the row back", async ({
+    page,
+    request,
+  }) => {
+    await withTwoEarlierResults(page, request);
+    const before = await rows(page).allTextContents();
+
+    await page
+      .getByRole("button", { name: /^Open the scan of/ })
+      .first()
+      .click();
+    await expect(findings(page)).toBeVisible();
+    await expect(rows(page)).toHaveCount(1);
+
+    const close = topOfResult(page).getByRole("button", { name: "Close this result" });
+    const remove = topOfResult(page).getByRole("button", { name: /^Delete the scan of/ });
+    await expect(close).toBeVisible();
+    await expect(remove).toBeVisible();
+    // The other row keeps its own Delete, so two Delete buttons exist: one up here, one down there.
+    await expect(page.getByRole("button", { name: /^Delete the scan of/ })).toHaveCount(2);
+
+    await close.click();
+    await expect(rows(page)).toHaveCount(2);
+    expect(await rows(page).allTextContents()).toEqual(before);
+    await expect(page.getByRole("button", { name: /^Open the scan of/ }).first()).toBeFocused();
+  });
+
+  test("Delete at the top asks first, Keep changes nothing, and Delete removes the result for good", async ({
+    page,
+    request,
+  }) => {
+    await withTwoEarlierResults(page, request);
+    await page
+      .getByRole("button", { name: /^Open the scan of/ })
+      .first()
+      .click();
+    await expect(findings(page)).toBeVisible();
+
+    await topOfResult(page)
+      .getByRole("button", { name: /^Delete the scan of/ })
+      .click();
+    await expect(page.getByRole("button", { name: "Keep scan" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Keep scan" })).toHaveCount(0);
+    await expect(
+      topOfResult(page).getByRole("button", { name: /^Delete the scan of/ }),
+    ).toBeFocused();
+    await expect(findings(page)).toBeVisible();
+
+    await topOfResult(page)
+      .getByRole("button", { name: /^Delete the scan of/ })
+      .click();
+    await page.getByRole("button", { name: "Delete scan" }).click();
+    await expect(findings(page)).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.getByRole("heading", { level: 3, name: "Earlier results" })).toBeFocused();
+
+    await page.reload();
+    await toggle(page).click();
+    await expect(rows(page)).toHaveCount(1);
+  });
+
+  test("works from the keyboard alone", async ({ page, request }) => {
+    await withTwoEarlierResults(page, request);
+    await page
+      .getByRole("button", { name: /^Open the scan of/ })
+      .first()
+      .focus();
+    await page.keyboard.press("Enter");
+    await expect(findings(page)).toBeVisible();
+    await topOfResult(page).getByRole("button", { name: "Close this result" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(rows(page)).toHaveCount(2);
+    await expect(page.getByRole("button", { name: /^Open the scan of/ }).first()).toBeFocused();
+  });
+
+  test.describe("on a phone-sized screen (320 px wide)", () => {
+    test.use({ viewport: { width: 320, height: 700 } });
+
+    test("the two buttons wrap without making the page scroll sideways", async ({
+      page,
+      request,
+    }) => {
+      await withTwoEarlierResults(page, request);
+      await page
+        .getByRole("button", { name: /^Open the scan of/ })
+        .first()
+        .click();
+      await expect(findings(page)).toBeVisible();
+      await expect(
+        topOfResult(page).getByRole("button", { name: /^Delete the scan of/ }),
+      ).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  });
+
+  for (const colorScheme of ["light", "dark"] as const) {
+    test.describe(`in ${colorScheme} mode`, () => {
+      test.use({ colorScheme });
+
+      test("has no accessibility violations with a result open and its delete question showing", async ({
+        page,
+        request,
+      }) => {
+        await withTwoEarlierResults(page, request);
+        await page
+          .getByRole("button", { name: /^Open the scan of/ })
+          .first()
+          .click();
+        await expect(findings(page)).toBeVisible();
+        await expectNoAxeViolations(page);
+
+        await topOfResult(page)
+          .getByRole("button", { name: /^Delete the scan of/ })
+          .click();
+        await expect(page.getByRole("button", { name: "Keep scan" })).toBeVisible();
+        await expectNoAxeViolations(page);
+      });
+    });
+  }
+});

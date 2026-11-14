@@ -13,6 +13,13 @@
   margin-bottom: var(--space-2);
 }
 
+/* Close and Delete side by side, wrapping under each other on a narrow screen. */
+.analysis-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .analysis-result__top h3 {
   margin: 0;
   min-width: 0;
