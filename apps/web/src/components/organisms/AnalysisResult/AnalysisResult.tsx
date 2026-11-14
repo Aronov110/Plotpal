@@ -1,4 +1,4 @@
-import type { ReactElement, Ref } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 import { describeRunFailure } from "../../../lib/analyses/analysis-feedback.ts";
 import {
   countFindings,
@@ -20,6 +20,17 @@ export interface AnalysisResultProps {
   /** Attach to the heading: the panel moves the focus there when a writer opens an earlier run. */
   readonly headingRef?: Ref<HTMLHeadingElement>;
   readonly onClose: () => void;
+  /**
+   * Called when Delete is pressed. Without it there is no Delete button. The panel answers by
+   * showing a question (`confirmation`); nothing is deleted by this press alone.
+   */
+  readonly onDelete?: () => void;
+  /** The name of the Delete button, so that it says which result it deletes. */
+  readonly deleteLabel?: string;
+  /** Attach to the Delete button: the focus comes back to it when the question is answered "keep". */
+  readonly deleteRef?: Ref<HTMLButtonElement>;
+  /** The question asked before a delete, shown under the buttons. */
+  readonly confirmation?: ReactNode;
   /** Called with the id of an item when a link to it is pressed. */
   readonly onOpenItem: (id: string) => void;
 }
@@ -117,6 +128,10 @@ export function AnalysisResult({
   titles,
   headingRef,
   onClose,
+  onDelete,
+  deleteLabel,
+  deleteRef,
+  confirmation,
   onOpenItem,
 }: AnalysisResultProps): ReactElement {
   const when = formatRunTime(analysis.createdAt);
@@ -154,10 +169,18 @@ export function AnalysisResult({
         <h3 id="analysis-result-heading" tabIndex={-1} ref={headingRef}>
           {heading}
         </h3>
-        <Button variant="secondary" onClick={onClose}>
-          Close this result
-        </Button>
+        <div className="analysis-result__actions">
+          <Button variant="secondary" onClick={onClose}>
+            Close this result
+          </Button>
+          {onDelete === undefined ? null : (
+            <Button variant="secondary" ref={deleteRef} aria-label={deleteLabel} onClick={onDelete}>
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
+      {confirmation}
 
       {analysis.kind === "ideas" && analysis.focus !== null ? (
         <p className="analysis-result__focus">

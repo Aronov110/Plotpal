@@ -545,6 +545,239 @@ describe("AiPanel: earlier results", () => {
   });
 });
 
+describe("AiPanel: an opened result leaves the list", () => {
+  const harbour = makeSucceeded([makeFinding({ title: "Harbour problem" })], {
+    scope: "document",
+    documentId: "doc-1",
+    createdAt: "2026-11-12T09:00:00.000Z",
+  });
+  const vault = makeSucceeded([makeFinding({ title: "Vault problem" })], {
+    scope: "document",
+    documentId: "doc-2",
+    createdAt: "2026-11-11T09:00:00.000Z",
+  });
+  const whole = makeSucceeded([makeFinding({ title: "Whole problem" })], {
+    createdAt: "2026-11-10T09:00:00.000Z",
+  });
+
+  const rows = () =>
+    screen.queryAllByRole("listitem").filter((item) => item.classList.contains("ai-panel__run"));
+  const rowTexts = () => rows().map((row) => row.textContent ?? "");
+  const openHarbour = () => screen.getByRole("button", { name: /^Open the scan of “The harbour”/ });
+  const openVault = () => screen.getByRole("button", { name: /^Open the scan of “The vault”/ });
+  const topPart = (): HTMLElement => {
+    const element = screen
+      .getByRole("heading", { level: 3, name: /^Scan of/ })
+      .closest(".analysis-result__top");
+    if (!(element instanceof HTMLElement)) throw new Error("no top part");
+    return element;
+  };
+
+  async function openedPanel(items = [harbour, vault, whole], nextCursor: string | null = null) {
+    const api = spies();
+    api.list.mockResolvedValue(page(items, nextCursor));
+    const panel = await renderPanel();
+    await openPanel(panel.user);
+    return { api, ...panel };
+  }
+
+  it("takes the result out of the list when it is opened, and the others keep their order", async () => {
+    const { user } = await openedPanel();
+    expect(rows()).toHaveLength(3);
+    await user.click(openHarbour());
+    await flush();
+    expect(rows()).toHaveLength(2);
+    expect(rowTexts()[0]).toContain("“The vault”");
+    expect(rowTexts()[1]).toContain("the whole project");
+    expect(rowTexts().join(" ")).not.toContain("The harbour");
+  });
+
+  it("puts Delete next to Close at the top of the result", async () => {
+    const { user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    expect(within(topPart()).getByRole("button", { name: "Close this result" })).toBeVisible();
+    expect(
+      within(topPart()).getByRole("button", { name: /^Delete the scan of “The harbour”/ }),
+    ).toBeVisible();
+  });
+
+  it("leaves only one Delete for the open result: the one at the top", async () => {
+    const { user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    expect(
+      screen.getAllByRole("button", { name: /^Delete the scan of “The harbour”/ }),
+    ).toHaveLength(1);
+    // The other rows keep theirs, so there are three in all.
+    expect(screen.getAllByRole("button", { name: /^Delete the scan of/ })).toHaveLength(3);
+  });
+
+  it.each([
+    ["first", 0],
+    ["middle", 1],
+    ["last", 2],
+  ])("puts the %s row back in its place when the result is closed", async (_where, index) => {
+    const { user } = await openedPanel();
+    const before = rowTexts();
+    const button = screen.getAllByRole("button", { name: /^Open the scan of/ })[index];
+    if (button === undefined) throw new Error("no such row");
+    await user.click(button);
+    await flush();
+    expect(rows()).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Close this result" }));
+    expect(rowTexts()).toEqual(before);
+  });
+
+  it("moves the focus to that row's Open button when the result is closed", async () => {
+    const { user } = await openedPanel();
+    await user.click(openVault());
+    await flush();
+    await user.click(screen.getByRole("button", { name: "Close this result" }));
+    expect(openVault()).toHaveFocus();
+  });
+
+  it("swaps which row is hidden when another result is opened", async () => {
+    const { user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    await user.click(openVault());
+    await flush();
+    expect(screen.getByRole("heading", { level: 3, name: /^Scan of “The vault”/ })).toBeVisible();
+    expect(rows()).toHaveLength(2);
+    expect(rowTexts()[0]).toContain("“The harbour”");
+    expect(rowTexts()[1]).toContain("the whole project");
+  });
+
+  it("says there are no others when the only result is open, and brings it back when closed", async () => {
+    const { user } = await openedPanel([harbour]);
+    await user.click(openHarbour());
+    await flush();
+    expect(screen.getByText("No other earlier results.")).toBeVisible();
+    expect(screen.queryByText("No earlier results.")).not.toBeInTheDocument();
+    expect(rows()).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Close this result" }));
+    expect(screen.queryByText("No other earlier results.")).not.toBeInTheDocument();
+    expect(rows()).toHaveLength(1);
+  });
+
+  it("keeps offering older results while a result is open, and does not claim there are none", async () => {
+    const { api, user } = await openedPanel([harbour], "cursor-2");
+    await user.click(openHarbour());
+    await flush();
+    expect(screen.queryByText("No other earlier results.")).not.toBeInTheDocument();
+
+    api.list.mockResolvedValue(page([vault], null));
+    await user.click(screen.getByRole("button", { name: "Show older results" }));
+    await flush();
+    expect(rows()).toHaveLength(1);
+    expect(rowTexts()[0]).toContain("“The vault”");
+    expect(screen.queryByRole("button", { name: "Show older results" })).not.toBeInTheDocument();
+  });
+
+  it("asks before deleting from the top, with Keep focused, and Keep deletes nothing", async () => {
+    const { api, user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+
+    await user.click(within(topPart()).getByRole("button", { name: /^Delete the scan of/ }));
+    const question = screen.getByRole("group", { name: /^Delete “scan of “The harbour”/ });
+    expect(question).toHaveTextContent("This cannot be undone.");
+    expect(within(question).getByRole("button", { name: "Keep scan" })).toHaveFocus();
+
+    await user.click(within(question).getByRole("button", { name: "Keep scan" }));
+    expect(screen.queryByRole("group", { name: /^Delete “scan of/ })).not.toBeInTheDocument();
+    expect(api.remove).not.toHaveBeenCalled();
+    expect(within(topPart()).getByRole("button", { name: /^Delete the scan of/ })).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 3, name: /^Scan of “The harbour”/ })).toBeVisible();
+  });
+
+  it("keeps the result when Escape is pressed in the question", async () => {
+    const { api, user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    await user.click(within(topPart()).getByRole("button", { name: /^Delete the scan of/ }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("group", { name: /^Delete “scan of/ })).not.toBeInTheDocument();
+    expect(api.remove).not.toHaveBeenCalled();
+    expect(within(topPart()).getByRole("button", { name: /^Delete the scan of/ })).toHaveFocus();
+  });
+
+  it("deletes it when confirmed, closes the result, and puts the focus on the list's heading", async () => {
+    const { api, user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    await user.click(within(topPart()).getByRole("button", { name: /^Delete the scan of/ }));
+    api.list.mockResolvedValue(page([vault, whole]));
+    await user.click(screen.getByRole("button", { name: "Delete scan" }));
+    await flush();
+
+    expect(api.remove).toHaveBeenCalledWith("project-1", harbour.id);
+    expect(screen.queryByRole("heading", { level: 3, name: /^Scan of/ })).not.toBeInTheDocument();
+    expect(rows()).toHaveLength(2);
+    expect(rowTexts().join(" ")).not.toContain("The harbour");
+    expect(screen.getByRole("heading", { level: 3, name: "Earlier results" })).toHaveFocus();
+  });
+
+  it("keeps the result and says so when the delete fails", async () => {
+    const { api, user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    await user.click(within(topPart()).getByRole("button", { name: /^Delete the scan of/ }));
+    api.remove.mockRejectedValue(apiError(500));
+    await user.click(screen.getByRole("button", { name: "Delete scan" }));
+    await flush();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("could not be deleted");
+    expect(screen.getByRole("heading", { level: 3, name: /^Scan of “The harbour”/ })).toBeVisible();
+    expect(rows()).toHaveLength(2);
+  });
+
+  it("drops a delete question that was open on the row when that result is opened", async () => {
+    const { user } = await openedPanel();
+    await user.click(screen.getByRole("button", { name: /^Delete the scan of “The harbour”/ }));
+    expect(screen.getByRole("group", { name: /^Delete “scan of/ })).toBeVisible();
+    await user.click(openHarbour());
+    await flush();
+    expect(screen.queryByRole("group", { name: /^Delete “scan of/ })).not.toBeInTheDocument();
+  });
+
+  it("does not bring the row back with a question when the result is closed with one open", async () => {
+    const { user } = await openedPanel();
+    await user.click(openHarbour());
+    await flush();
+    await user.click(within(topPart()).getByRole("button", { name: /^Delete the scan of/ }));
+    await user.click(screen.getByRole("button", { name: "Close this result" }));
+    expect(screen.queryByRole("group", { name: /^Delete “scan of/ })).not.toBeInTheDocument();
+    expect(rows()).toHaveLength(3);
+  });
+
+  it("also takes a result that has just finished out of the list, and puts it back on close", async () => {
+    const api = spies();
+    const pending = makeAnalysis();
+    api.start.mockResolvedValue(pending);
+    api.get.mockResolvedValue(pending);
+    const { user } = await renderPanel();
+    await openPanel(user);
+    await user.click(screen.getByRole("button", { name: "Run the scan" }));
+    await flush();
+
+    const finished = makeSucceeded([makeFinding()], { id: pending.id });
+    api.get.mockResolvedValue(finished);
+    api.list.mockResolvedValue(page([finished, vault]));
+    await flush(2000);
+
+    expect(screen.getByRole("heading", { level: 3, name: /^Scan of/ })).toBeVisible();
+    expect(rows()).toHaveLength(1);
+    expect(rowTexts()[0]).toContain("“The vault”");
+
+    await user.click(screen.getByRole("button", { name: "Close this result" }));
+    expect(rows()).toHaveLength(2);
+    expect(rowTexts()[0]).toContain("the whole project");
+  });
+});
+
 // axe uses timers of its own, so these tests run with real ones and wait for the screen with findBy.
 describe("AiPanel: accessibility", () => {
   beforeEach(() => {
