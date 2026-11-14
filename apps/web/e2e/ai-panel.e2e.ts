@@ -8,6 +8,7 @@ import {
 } from "./support/api-control.ts";
 import { expectNoAxeViolations } from "./support/axe.ts";
 import { logIn } from "./support/flows.ts";
+import { waitForAnimationsToEnd } from "./support/motion.ts";
 import { uniqueUser } from "./support/users.ts";
 
 // The API behind these tests answers with a fake AI model (see apps/api/src/test-support/e2e-server.ts):
@@ -21,6 +22,11 @@ const STORY: readonly SeedDocument[] = [
 ];
 
 const toggle = (page: Page) => page.getByRole("button", { name: /AI assistant/ });
+/** Opens the drawer and waits for it to finish opening: at 320 px it grows, and what is inside moves. */
+async function openPanel(page: Page): Promise<void> {
+  await toggle(page).click();
+  await waitForAnimationsToEnd(page);
+}
 const runButton = (page: Page) => page.getByRole("button", { name: "Run the scan" });
 const findings = (page: Page) => page.getByRole("list", { name: "Findings" });
 
@@ -52,7 +58,7 @@ test.describe("the plot-hole finder", () => {
     await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");
     await expect(runButton(page)).toBeHidden();
 
-    await toggle(page).click();
+    await openPanel(page);
     await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByText(/Costs about/)).toBeVisible();
     await expect(page.getByText(/sent to Anthropic/)).toBeVisible();
@@ -65,7 +71,7 @@ test.describe("the plot-hole finder", () => {
     request,
   }) => {
     await openStory(page, request);
-    await toggle(page).click();
+    await openPanel(page);
     await runButton(page).click();
 
     await expect(page.getByRole("progressbar", { name: "The scan is running" })).toBeVisible();
@@ -95,7 +101,7 @@ test.describe("the plot-hole finder", () => {
     const text = page.getByRole("textbox", { name: "Text of “Act One”" });
     await expect(text).toBeFocused();
 
-    await toggle(page).click();
+    await openPanel(page);
     await runButton(page).click();
     await expect(findings(page)).toBeVisible({ timeout: RESULT_TIMEOUT });
     await expect(text).not.toBeFocused();
@@ -114,7 +120,7 @@ test.describe("the plot-hole finder", () => {
       .click();
     await expect(page.getByRole("textbox", { name: "Text of “The Storm”" })).toBeVisible();
 
-    await toggle(page).click();
+    await openPanel(page);
     await expect(page.getByRole("radio", { name: "The open item: “The Storm”" })).toBeChecked();
     await runButton(page).click();
     await expect(page.getByRole("heading", { level: 3, name: /^Scan of “The Storm”/ })).toBeVisible(
@@ -125,7 +131,7 @@ test.describe("the plot-hole finder", () => {
   test("can be cancelled while it runs", async ({ page, request }) => {
     await openStory(page, request);
     await aiNext(request, "hold");
-    await toggle(page).click();
+    await openPanel(page);
     await runButton(page).click();
 
     await page.getByRole("button", { name: "Cancel the scan" }).click();
@@ -137,7 +143,7 @@ test.describe("the plot-hole finder", () => {
   test("explains a scan the AI declined, in plain words", async ({ page, request }) => {
     await openStory(page, request);
     await aiNext(request, "refused");
-    await toggle(page).click();
+    await openPanel(page);
     await runButton(page).click();
     await expect(page.getByText(/The AI declined to read this text/)).toBeVisible({
       timeout: RESULT_TIMEOUT,
@@ -150,12 +156,12 @@ test.describe("the plot-hole finder", () => {
   }) => {
     await openStory(page, request);
     await aiNext(request, "hold");
-    await toggle(page).click();
+    await openPanel(page);
     await runButton(page).click();
     await expect(page.getByRole("progressbar")).toBeVisible();
 
     await page.reload();
-    await toggle(page).click();
+    await openPanel(page);
     await expect(page.getByRole("progressbar")).toBeVisible();
 
     await releaseAi(request);
@@ -164,12 +170,12 @@ test.describe("the plot-hole finder", () => {
 
   test("keeps earlier results, which can be opened and deleted", async ({ page, request }) => {
     await openStory(page, request);
-    await toggle(page).click();
+    await openPanel(page);
     await runButton(page).click();
     await expect(findings(page)).toBeVisible({ timeout: RESULT_TIMEOUT });
 
     await page.reload();
-    await toggle(page).click();
+    await openPanel(page);
     await page.getByRole("button", { name: /^Open the scan of the whole project/ }).click();
     await expect(findings(page)).toBeVisible();
     await expect(
@@ -198,7 +204,7 @@ test.describe("the plot-hole finder", () => {
   }) => {
     await openStory(page, request);
     await aiNext(request, "hold");
-    await toggle(page).click();
+    await openPanel(page);
     await expectNoAxeViolations(page);
 
     await runButton(page).click();
@@ -222,14 +228,14 @@ test.describe("an opened result leaves the list of earlier results", () => {
   /** Two finished scans in the history, the panel open and no result shown. */
   async function withTwoEarlierResults(page: Page, request: Parameters<typeof createAccount>[0]) {
     await openStory(page, request);
-    await toggle(page).click();
+    await openPanel(page);
     for (let run = 0; run < 2; run += 1) {
       await runButton(page).click();
       await expect(findings(page)).toBeVisible({ timeout: RESULT_TIMEOUT });
       await page.getByRole("button", { name: "Close this result" }).click();
     }
     await page.reload();
-    await toggle(page).click();
+    await openPanel(page);
     await expect(rows(page)).toHaveCount(2);
   }
 
@@ -291,7 +297,7 @@ test.describe("an opened result leaves the list of earlier results", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Earlier results" })).toBeFocused();
 
     await page.reload();
-    await toggle(page).click();
+    await openPanel(page);
     await expect(rows(page)).toHaveCount(1);
   });
 
@@ -353,6 +359,46 @@ test.describe("an opened result leaves the list of earlier results", () => {
           .click();
         await expect(page.getByRole("button", { name: "Keep scan" })).toBeVisible();
         await expectNoAxeViolations(page);
+      });
+    });
+  }
+});
+
+test.describe("the cost line does not push the panel down when it arrives", () => {
+  // The estimate is held back for a moment, so the panel can be measured while it is "working out the
+  // cost" and again once the real text is there. "Run the scan" must stay exactly where it is: if it
+  // moves, a click that lands just then goes to whatever moved under the pointer.
+  for (const width of [320, 1200]) {
+    test.describe(`${width} px wide`, () => {
+      test.use({ viewport: { width, height: 800 } });
+
+      test("Run the scan keeps its place", async ({ page, request }) => {
+        await page.route(/\/analyses\/estimate/, async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await route.continue();
+        });
+        await openStory(page, request);
+        await toggle(page).click();
+        await expect(page.getByText("Working out the cost…")).toBeVisible();
+
+        // Where the button is inside the drawer, so the drawer's own sliding in does not count.
+        const place = () =>
+          runButton(page).evaluate((button) => {
+            const drawer = button.closest("aside");
+            if (drawer === null) throw new Error("the button is not in the drawer");
+            return (
+              button.getBoundingClientRect().top -
+              drawer.getBoundingClientRect().top +
+              drawer.scrollTop
+            );
+          });
+
+        await page.waitForTimeout(700);
+        const whileLoading = await place();
+        await expect(page.getByText(/Costs about/)).toBeVisible();
+        await page.waitForTimeout(200);
+        const afterwards = await place();
+        expect(Math.abs(afterwards - whileLoading)).toBeLessThanOrEqual(2);
       });
     });
   }

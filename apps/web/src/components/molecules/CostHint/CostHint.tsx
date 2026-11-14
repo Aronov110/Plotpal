@@ -14,6 +14,14 @@ export interface CostHintProps {
 }
 
 /**
+ * A typical finished hint. While the real one is worked out it is laid, invisible, under the words
+ * "Working out the cost…" so the line already takes the room the finished text will take. Without it
+ * everything below (the Run button, the history) would jump down when the answer arrives.
+ */
+export const LOADING_SAMPLE =
+  "Less than a page of text. Costs about $0.09 to $0.33. You have 10 AI requests left in the last 24 hours.";
+
+/**
  * What a run would cost, before it is run: the size of the text, a rough price and what is left of
  * the day's allowance. It makes no AI call. A text that is too long for one go says so here.
  */
@@ -23,8 +31,11 @@ export function CostHint({ view, onRetry }: CostHintProps): ReactElement | null 
       return null;
     case "loading":
       return (
-        <p role="status" className="cost-hint">
-          Working out the cost…
+        <p role="status" className="cost-hint cost-hint--loading">
+          <span className="cost-hint__sizer" aria-hidden="true">
+            {LOADING_SAMPLE}
+          </span>
+          <span>Working out the cost…</span>
         </p>
       );
     case "failed":
