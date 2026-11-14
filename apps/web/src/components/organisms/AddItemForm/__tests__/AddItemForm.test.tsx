@@ -71,9 +71,22 @@ describe("AddItemForm: what it shows", () => {
     expect(document.querySelector("b")).toBeNull();
   });
 
-  it("hints how the title is used", async () => {
+  it("hints that an act or a chapter is added when nothing is open, and does not offer a scene", async () => {
     await renderForm();
-    expect(title()).toHaveAccessibleDescription("The name of the new act, chapter or scene.");
+    expect(title()).toHaveAccessibleDescription("The name of the new act or chapter.");
+    expect(title()).not.toHaveAccessibleDescription(/scene/i);
+  });
+
+  it("hints that a scene, an act or a chapter can be added when an act is open", async () => {
+    await renderForm(ACT);
+    expect(title()).toHaveAccessibleDescription("The name of the new scene, act or chapter.");
+  });
+
+  it("changes the hint when an act is opened", async () => {
+    const { openAct } = await renderForm();
+    expect(title()).toHaveAccessibleDescription("The name of the new act or chapter.");
+    openAct({ id: "act-9", title: "Act Nine" });
+    expect(title()).toHaveAccessibleDescription("The name of the new scene, act or chapter.");
   });
 });
 
