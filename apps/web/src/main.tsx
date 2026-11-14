@@ -1,3 +1,5 @@
+// Must come first: it sets Zod up before any module makes a schema (see the module for why).
+import "./lib/zod-config.ts";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";

@@ -1,0 +1,63 @@
+# The Plotpal API on Fly.io (https://fly.io/docs/reference/configuration/).
+#
+# `app` must be unique across all of Fly. Pick the real name when the app is created with
+# `fly launch --no-deploy --copy-config`; the vercel.json rewrites need the same name.
+#
+# Nothing secret is in this file. Set the secrets once with `fly secrets set`:
+#   DATABASE_URL        the Supabase session-pooler address
+#   JWT_ACCESS_SECRET   a generated random value (see .env.example)
+#   CORS_ORIGINS        https://<the Vercel address>, no trailing slash
+#   DATABASE_SSL_CA     (only if the database's certificate needs it) the certificate, as text
+#   ANTHROPIC_API_KEY   (later, when AI is switched on)
+
+app = "plotpal-api-aronovdavid"
+# Tokyo: Fly has no region in Seoul, and Tokyo is the nearest one to the database (Supabase, Seoul).
+primary_region = "nrt"
+
+# Fly stops the old machine in a deploy with this signal and waits this long; the API (shutdown.ts)
+# finishes what it is doing, closes the database and gives up by itself after 25 seconds.
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  API_HOST = "0.0.0.0"
+  API_PORT = "8080"
+  # Off at first: no AI cost until the rest is proven. Switch on with `fly secrets set` for the key and
+  # a new value here.
+  AI_ENABLED = "false"
+  # Two proxies stand in front of the API: Vercel (which forwards /auth and /projects) and Fly's own.
+  # The visitor's address is read from that many hops of X-Forwarded-For, from the right.
+  TRUST_PROXY = "2"
+  # Supabase only talks encrypted.
+  DATABASE_SSL = "on"
+  DATABASE_POOL_MAX = "10"
+
+# Before each deploy, a temporary machine applies the database migrations. If that fails, the deploy
+# stops and the running version is left alone.
+[deploy]
+  release_command = "node src/db/migrate-cli.ts"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The AI runs live inside the process, so the machine must never be stopped for being quiet.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+# One small machine. Each login hashes a password with about 64 MB of memory and at most 3 run at
+# once, so 512 MB is enough to start; watch `fly logs` and `fly status` and raise it if needed.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

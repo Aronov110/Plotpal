@@ -21,11 +21,19 @@ const DOCS_CSP = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+export interface OpenApiOptions {
+  /** Whether the /docs page and the API description are served at all (`DOCS_ENABLED`). */
+  readonly docs: boolean;
+}
+
 /**
  * Generates the OpenAPI document from the routes' Zod schemas and serves it with Scalar at `/docs`.
  * Call before registering routes so every route is collected.
  */
-export function registerOpenApi(app: FastifyInstance): void {
+export function registerOpenApi(app: FastifyInstance, options: OpenApiOptions): void {
+  // Off: nothing is registered, so there is no page, no document and no route list to find.
+  if (!options.docs) return;
+
   app.register(swagger, {
     openapi: {
       openapi: "3.1.0",

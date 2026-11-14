@@ -428,6 +428,86 @@ has been open once, and a run goes on while it is closed.
   hook, the wording of every error, the cost text, the focus rules) and
   `apps/web/src/components/organisms/AiPanel/`.
 
+## Deploying
+
+The live version runs on three services: the web app on **Vercel**, the API on **Fly.io** (Tokyo),
+the database on **Supabase** (Seoul). Start on the free tiers with the AI off.
+
+### The one rule: the browser sees one address
+
+The login cookies are `SameSite=Strict` and host-only (`__Host-` in production), and the web app reads
+the CSRF cookie of its own host. So the page and the API must share one address. `apps/web/vercel.json`
+makes Vercel forward `/auth/*` and `/projects/*` to the API on Fly (a _rewrite_: Vercel answers the
+browser and asks Fly for it), and everything else is the web app. The list is the same as the
+development proxy's (`dev-proxy.ts`), and a test fails if they drift apart. If the web app called Fly
+directly, login would silently break.
+
+### What is in the repository
+
+| File                                   | What it is                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/Dockerfile`, `.dockerignore` | The API image: two stages, base images pinned by digest, runs as the `node` user, nothing but the source and migrations (an allow-list, so a `.env` can never get in). Build from the repository root: `docker build -f apps/api/Dockerfile -t plotpal-api .`                                                    |
+| `fly.toml`                             | Fly settings: region `nrt` (Tokyo), port 8080, health check on `/health`, one machine always on (AI runs live inside the process), `AI_ENABLED=false`, `TRUST_PROXY=2`, `DATABASE_SSL=on`, and a release step that applies the migrations before every deploy (a failed migration stops the deploy). No secrets. |
+| `apps/web/vercel.json`                 | The rewrites above, the SPA fallback, the security headers (a strict Content Security Policy, HSTS, no framing) and the caching rules.                                                                                                                                                                           |
+| `apps/api/drizzle/0005_*.sql`          | Row Level Security on every table (see below).                                                                                                                                                                                                                                                                   |
+
+### Settings
+
+Plain ones are in `fly.toml`; secrets are set once with `fly secrets set NAME=value` and never written
+to a file in the repository.
+
+| Setting             | Where             | Meaning                                                                                                                                                                                     |
+| ------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | secret            | The Supabase **session pooler** address (it works over IPv4, and the API sets the time zone per connection, which the transaction pooler would lose). No `?sslmode=`: use `DATABASE_SSL`.   |
+| `JWT_ACCESS_SECRET` | secret            | Generated, at least 32 random characters.                                                                                                                                                   |
+| `CORS_ORIGINS`      | secret            | `https://<the Vercel address>`, no trailing slash.                                                                                                                                          |
+| `DATABASE_SSL_CA`   | secret, if needed | The certificate authority as text, if Supabase's certificate is not trusted by default.                                                                                                     |
+| `ANTHROPIC_API_KEY` | secret, later     | Only when AI is switched on (`AI_ENABLED=true`). The daily token caps (`AI_*_DAILY_*`) cap the bill.                                                                                        |
+| `TRUST_PROXY`       | `fly.toml`        | `2`: Vercel, then Fly. The visitor's address (rate limits, login limits) is read two hops from the right of `X-Forwarded-For`. An address a visitor makes up on the left is never believed. |
+| `DOCS_ENABLED`      | `fly.toml`        | Off by default in production: the live API does not publish its own route list.                                                                                                             |
+
+### Supabase
+
+- **Switch the Data API off** (Project settings, API) and keep the connection string to yourself. Supabase can
+  publish the tables of the `public` schema as a REST API for anyone with its public key; this app
+  never uses that. Migration `0005` also turns on Row Level Security for every table (no policy, so
+  those roles see nothing) and removes their privileges, and `row-security.integration.test.ts` fails
+  if a future table forgets it. The API connects as the table owner, which RLS does not restrict.
+- The free plan pauses a project after a quiet week and has no automatic backups. Upgrade before real
+  users, or take your own `pg_dump`.
+
+### First deploy, in order
+
+The providers change their screens, commands and prices: check their current documentation as you go.
+
+1. **Supabase:** create the project (Seoul, `ap-northeast-2`), copy the session-pooler address, switch the Data API off.
+2. **Fly:** `fly launch --no-deploy --copy-config` (pick the real app name and put it in `fly.toml` and
+   in the two destinations of `vercel.json`), `fly secrets set ...`, `fly deploy`. The release step
+   applies the migrations; then check `https://<app>.fly.dev/health`.
+3. **Vercel:** import the repository, root directory `apps/web`, then set `CORS_ORIGINS` on Fly to
+   the Vercel address (`fly secrets set CORS_ORIGINS=https://...`).
+4. **Smoke test** on the Vercel address: sign up, reload (still signed in), create a project, write,
+   sign out. Watch `fly logs`: the logged visitor address must be yours, not Vercel's or Fly's (if
+   it is not, the hop count in `TRUST_PROXY` is wrong).
+5. Switch the AI on later: `fly secrets set ANTHROPIC_API_KEY=...`, set `AI_ENABLED = "true"` in
+   `fly.toml`, `fly deploy`.
+
+Roll back with `fly releases` and `fly deploy --image <the earlier image>`. A deploy or a crash stops
+the AI runs that are going; they are written down as failed the next time the API starts.
+
+### Known limits
+
+- Someone who calls the Fly address directly (not through Vercel) can put a made-up address in
+  `X-Forwarded-For` and so dodge the per-address rate limits. It is not a way around logging in:
+  passwords are hashed and limited per account. A later step can make Fly accept only Vercel.
+- One machine in one region: a deploy has a moment of no service. Fly has no region in Seoul, so the
+  API (Tokyo) talks to the database (Seoul) across a short sea hop, a few tens of milliseconds for each
+  database query; moving the database to Supabase's Tokyo region would remove it. Visitors far from
+  East Asia wait longer for every login and save (only the page itself comes from Vercel's network
+  worldwide).
+- 512 MB of memory: each login hashes a password with about 64 MB and at most 3 run at once. Raise the
+  memory in `fly.toml` if `fly logs` shows out-of-memory kills.
+
 ## Checks
 
 ```sh
@@ -453,6 +533,11 @@ web app and a real API. It is not part of `bun run test`: it is slower and needs
 - **What it covers:** the full sign-up, reload, sign-out and login journeys; the cookie flags
   through the dev proxy; no token in browser storage; axe (accessibility) in light and dark mode
   with colour contrast; 320 px reflow; target size; keyboard and focus order.
+- **The production headers:** the built web app is served by `vite preview`, which sends the same
+  security headers as `vercel.json` (read from that file). Every test bypasses the Content Security
+  Policy, because the accessibility checker has to inject a script; `csp.e2e.ts` turns the
+  enforcement back on and walks the app (sign in, projects, writing screen, AI drawer, theme switch)
+  and fails on any violation or console error.
 - **Limits:** the web app is built with `NODE_ENV=development` for the run, because the API sets the
   plain cookie name `csrf_token` over http and a production build reads only `__Host-csrf_token`.
   The production cookie names and flags (`__Host-`, `Secure`) need https and are not covered.

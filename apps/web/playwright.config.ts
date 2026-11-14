@@ -21,6 +21,10 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: WEB_ORIGIN,
+    // The built app is served under the production Content Security Policy (vite.config.ts), which
+    // also blocks the script the accessibility checker has to inject. So the policy is bypassed here,
+    // and csp.e2e.ts turns the enforcement back on to check that the app itself satisfies it.
+    bypassCSP: true,
     // Traces can contain typed passwords and cookies. They stay in the gitignored test-results/.
     trace: "retain-on-failure",
   },

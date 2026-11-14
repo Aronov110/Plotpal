@@ -83,6 +83,9 @@ export function buildApp(env: Env, deps: AppDependencies): FastifyInstance {
     logger: buildLoggerOptions(env, deps.logStream),
     bodyLimit: BODY_LIMIT_BYTES,
     frameworkErrors: frameworkErrorHandler,
+    // The visitor's address is read from this many hops of X-Forwarded-For, counted from the right, so
+    // an address a visitor makes up on the left is never believed. 0 trusts no proxy at all.
+    trustProxy: env.TRUST_PROXY === 0 ? false : (_address, hop) => hop < env.TRUST_PROXY,
   });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -144,7 +147,7 @@ export function buildApp(env: Env, deps: AppDependencies): FastifyInstance {
   // keeps only the hooks that existed when it was created. So security comes first, which makes
   // the docs routes (registered by OpenAPI) rate limited too. All of it comes before the routes.
   registerSecurity(app, env);
-  registerOpenApi(app);
+  registerOpenApi(app, { docs: env.DOCS_ENABLED });
   app.register(cookie);
 
   app.register(healthRoutes);
