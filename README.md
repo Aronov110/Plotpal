@@ -180,6 +180,14 @@ side. The open item is in the query string, so Back works and a link leads strai
 choosing or adding an item moves the focus into its text. "Add to the outline" adds an act or chapter
 at the top level, or a scene inside the open act (one level of nesting).
 
+- **It is loaded when it is first opened**, not with the landing and login pages (`lazy` in
+  `routes.tsx`). While the file is on its way, the app's header and a loading status show, with no
+  heading, and `RouteFocus` waits up to 5 seconds for the screen's own heading before moving the focus
+  there. A tab opened before a new version went live can ask for a file that no longer exists (the
+  host answers with the home page's HTML): the page then reloads once
+  (`lib/navigation/reload-on-stale-chunk.ts`, guarded by a time in `sessionStorage` so that it cannot
+  loop), and a screen that still cannot load shows a message with a Reload button
+  (`RouteErrorBoundary`).
 - **The bar at the top** has the way back, the project's title (the screen's level-one heading) and two
   buttons, **Outline** and **AI assistant**, each with `aria-expanded` and `aria-controls`. The
   outline starts open and the drawer starts closed; neither is remembered between visits.
@@ -604,7 +612,9 @@ web app and a real API. It is not part of `bun run test`: it is slower and needs
   relaxes only the per-address sign-up and login limits. It refuses `NODE_ENV=production`.
 - **What it covers:** the full sign-up, reload, sign-out and login journeys; the cookie flags
   through the dev proxy; no token in browser storage; axe (accessibility) in light and dark mode
-  with colour contrast; 320 px reflow; target size; keyboard and focus order.
+  with colour contrast; 320 px reflow; target size; keyboard and focus order; that the writing
+  screen's files are not downloaded before a project is opened, and that a missing file reloads the
+  page once and then shows the message (`lazy-loading.e2e.ts`).
 - **The production headers:** the built web app is served by `vite preview`, which sends the same
   security headers as `vercel.json` (read from that file). Every test bypasses the Content Security
   Policy, because the accessibility checker has to inject a script; `csp.e2e.ts` turns the
