@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StrictMode, useLayoutEffect, useRef } from "react";
+import { StrictMode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
-import { RouteFocus } from "../RouteFocus.tsx";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { deferred } from "../../../../test-support/session-harness.ts";
+import { HEADING_WAIT_LIMIT_MS, RouteFocus } from "../RouteFocus.tsx";
 
 /** An editable element that takes the focus when it appears, as a writing area might. */
 function EditableDraft() {
@@ -204,5 +205,172 @@ describe("RouteFocus", () => {
         .click(screen.getByRole("link", { name: "Go to a page with a focused button" }));
       expect(screen.getByRole("heading", { level: 1, name: "Button page" })).toHaveFocus();
     });
+  });
+});
+
+/**
+ * A screen whose heading arrives after the screen itself, as a screen loaded on demand does: the
+ * address has changed and the page frame is there, but the heading only appears once `gate` opens.
+ */
+function LateScreen({ gate }: { readonly gate: Promise<undefined> }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let current = true;
+    void gate.then(() => {
+      if (current) setReady(true);
+    });
+    return () => {
+      current = false;
+    };
+  }, [gate]);
+  return (
+    <main>
+      <input aria-label="Search" />
+      <Link to="/other">Go to other</Link>
+      <Link to="/">Go back home</Link>
+      {ready ? <h1 tabIndex={-1}>Late screen</h1> : <p>Loading…</p>}
+    </main>
+  );
+}
+
+function renderLateApp(gate: Promise<undefined>, strict = false) {
+  const app = (
+    <MemoryRouter initialEntries={["/"]}>
+      <RouteFocus />
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <main>
+              <h1 tabIndex={-1}>Home</h1>
+              <Link to="/late">Go to late</Link>
+            </main>
+          }
+        />
+        <Route path="/late" element={<LateScreen gate={gate} />} />
+        <Route
+          path="/other"
+          element={
+            <main>
+              <h1 tabIndex={-1}>Other</h1>
+            </main>
+          }
+        />
+      </Routes>
+    </MemoryRouter>
+  );
+  return render(strict ? <StrictMode>{app}</StrictMode> : app);
+}
+
+describe("RouteFocus when the heading of the new screen arrives late", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("moves the focus to the heading as soon as it appears", async () => {
+    const gate = deferred<undefined>();
+    renderLateApp(gate.promise);
+    await userEvent.setup().click(screen.getByRole("link", { name: "Go to late" }));
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+
+    await act(async () => {
+      gate.resolve(undefined);
+    });
+    const heading = await screen.findByRole("heading", { level: 1, name: "Late screen" });
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it("does the same under StrictMode, which runs every effect twice while developing", async () => {
+    const gate = deferred<undefined>();
+    renderLateApp(gate.promise, true);
+    await userEvent.setup().click(screen.getByRole("link", { name: "Go to late" }));
+
+    await act(async () => {
+      gate.resolve(undefined);
+    });
+    const heading = await screen.findByRole("heading", { level: 1, name: "Late screen" });
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it("leaves the focus in a field the person has started typing into while waiting", async () => {
+    const gate = deferred<undefined>();
+    renderLateApp(gate.promise);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("link", { name: "Go to late" }));
+    const field = screen.getByLabelText("Search");
+    await user.click(field);
+
+    await act(async () => {
+      gate.resolve(undefined);
+    });
+    await screen.findByRole("heading", { level: 1, name: "Late screen" });
+    expect(field).toHaveFocus();
+  });
+
+  it("stops waiting when the person goes somewhere else first", async () => {
+    const gate = deferred<undefined>();
+    renderLateApp(gate.promise);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("link", { name: "Go to late" }));
+    await user.click(screen.getByRole("link", { name: "Go to other" }));
+    const other = screen.getByRole("heading", { level: 1, name: "Other" });
+    expect(other).toHaveFocus();
+
+    // A heading that turns up later, in front of the first one, must not take the focus: the wait for
+    // the screen that was left is over. (Counting timers would also count React's own.)
+    await act(async () => {
+      const extra = document.createElement("h1");
+      extra.tabIndex = -1;
+      extra.textContent = "Extra";
+      document.querySelector("main")?.prepend(extra);
+    });
+    expect(other).toHaveFocus();
+  });
+
+  it("puts the focus on the heading of the screen the person went back to, before the late one arrived", async () => {
+    const gate = deferred<undefined>();
+    renderLateApp(gate.promise);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("link", { name: "Go to late" }));
+    await user.click(screen.getByRole("link", { name: "Go back home" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Home" })).toHaveFocus();
+  });
+
+  it("gives up after a while, so a screen that never gets a heading is not watched forever", async () => {
+    vi.useFakeTimers();
+    const gate = deferred<undefined>();
+    renderLateApp(gate.promise);
+    fireEvent.click(screen.getByRole("link", { name: "Go to late" }));
+    expect(vi.getTimerCount()).toBe(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(HEADING_WAIT_LIMIT_MS + 1);
+    });
+    expect(vi.getTimerCount()).toBe(0);
+
+    await act(async () => {
+      gate.resolve(undefined);
+    });
+    const heading = screen.getByRole("heading", { level: 1, name: "Late screen" });
+    expect(heading).not.toHaveFocus();
+  });
+
+  it("stops watching when the app goes away", () => {
+    vi.useFakeTimers();
+    const gate = deferred<undefined>();
+    const view = renderLateApp(gate.promise);
+    fireEvent.click(screen.getByRole("link", { name: "Go to late" }));
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("waits only as long as it must: a heading already there is focused at once", async () => {
+    const gate = deferred<undefined>();
+    gate.resolve(undefined);
+    renderLateApp(gate.promise);
+    await userEvent.setup().click(screen.getByRole("link", { name: "Go to late" }));
+    const heading = await screen.findByRole("heading", { level: 1, name: "Late screen" });
+    await waitFor(() => expect(heading).toHaveFocus());
   });
 });
