@@ -24,8 +24,6 @@ computer, which is still how it is developed and tested.
 
 - Node.js >= 24 (LTS or newer)
 - [bun](https://bun.sh) (package manager; the only lockfile is `bun.lock`)
-- Docker (for the local PostgreSQL database that development and the integration and browser tests
-  use; the live site uses Supabase instead)
 
 ## Setup
 
