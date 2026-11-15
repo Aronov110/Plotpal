@@ -1,19 +1,41 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { DatabaseHandle } from "../../db/client.ts";
+import type { Database, DatabaseHandle } from "../../db/client.ts";
 import { refreshSessions } from "../../db/schema/refresh-sessions.ts";
 import { users } from "../../db/schema/users.ts";
 import { insertUser } from "../../db/test-support/factories.ts";
 import { connectTestDatabase, resetTables } from "../../db/test-support/test-database.ts";
 import {
   createSession,
-  findLiveSession,
   findSessionFamily,
   type RotateOptions,
   revokeFamilyByToken,
   rotateSession,
 } from "../sessions.ts";
+
+/**
+ * The user and login family of a token that is neither revoked nor expired. The app never asks this
+ * question (a refresh looks the token up and rotates it in one step), so it lives here, as the check
+ * these tests use to see what rotating and revoking did.
+ */
+async function findLiveSession(
+  db: Database,
+  tokenHash: string,
+): Promise<{ userId: string; familyId: string } | undefined> {
+  const [row] = await db
+    .select({ userId: refreshSessions.userId, familyId: refreshSessions.familyId })
+    .from(refreshSessions)
+    .where(
+      and(
+        eq(refreshSessions.tokenHash, tokenHash),
+        isNull(refreshSessions.revokedAt),
+        gt(refreshSessions.expiresAt, sql`now()`),
+      ),
+    )
+    .limit(1);
+  return row;
+}
 
 const hash = () => randomBytes(32).toString("hex");
 const POLICY = { ttlDays: 30, absoluteDays: 90, graceSeconds: 10 } as const;
