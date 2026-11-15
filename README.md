@@ -9,7 +9,6 @@ Users sign up and sign in, and their work is stored in a database.
 
 - Node.js >= 24 (LTS or newer)
 - [bun](https://bun.sh) (package manager; the only lockfile is `bun.lock`)
-- Docker (for the local PostgreSQL database)
 
 ## Setup
 
