@@ -476,12 +476,12 @@ path. If the web app called Fly directly, login would silently break.
 
 ### What is in the repository
 
-| File                                   | What it is                                                                                                                                                                                                                                                                                                       |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/Dockerfile`, `.dockerignore` | The API image: two stages, base images pinned by digest, runs as the `node` user, nothing but the source and migrations (an allow-list, so a `.env` can never get in). Build from the repository root: `docker build -f apps/api/Dockerfile -t plotpal-api .`                                                    |
+| File                                   | What it is                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/Dockerfile`, `.dockerignore` | The API image: two stages, base images pinned by digest, runs as the `node` user, nothing but the source and migrations (an allow-list, so a `.env` can never get in). Build from the repository root: `docker build -f apps/api/Dockerfile -t plotpal-api .`                                                                                                 |
 | `fly.toml`                             | Fly settings: region `nrt` (Tokyo), port 8080, health check on `/health`, one machine always on (AI runs live inside the process), `AI_ENABLED=false` (a Fly secret of the same name overrides it), `TRUST_PROXY=2`, `DATABASE_SSL=on`, and a release step that applies the migrations before every deploy (a failed migration stops the deploy). No secrets. |
-| `apps/web/vercel.json`                 | The rewrites above, the SPA fallback, the security headers (a strict Content Security Policy, HSTS, no framing) and the caching rules.                                                                                                                                                                           |
-| `apps/api/drizzle/0005_*.sql`          | Row Level Security on every table (see below).                                                                                                                                                                                                                                                                   |
+| `apps/web/vercel.json`                 | The rewrites above, the SPA fallback, the security headers (a strict Content Security Policy, HSTS, no framing) and the caching rules.                                                                                                                                                                                                                        |
+| `apps/api/drizzle/0005_*.sql`          | Row Level Security on every table (see below).                                                                                                                                                                                                                                                                                                                |
 
 ### Settings
 
@@ -490,17 +490,17 @@ the repository. A secret overrides a `fly.toml` value of the same name. Type or 
 only into your own terminal, never into a chat, an issue or a commit; `flyctl secrets list` shows names
 only.
 
-| Setting | Where | Meaning |
-| --- | --- | --- |
-| `DATABASE_URL` | secret | The Supabase **session pooler** address (port 5432, user `postgres.<project reference>`). It works over IPv4, and the API sets the time zone per connection, which the transaction pooler would lose. A URL that carries `ssl` parameters is refused: use `DATABASE_SSL`. |
-| `JWT_ACCESS_SECRET` | secret | Generated, at least 32 random characters. |
-| `CORS_ORIGINS` | secret | `https://<the Vercel address>`, no trailing slash. |
-| `DATABASE_SSL_CA` | secret | The certificate authority that signed Supabase's certificate (Supabase publishes it as `prod-ca-2021.crt`), as text. The API checks the certificate strictly, and without this it refuses Supabase's. |
-| `ANTHROPIC_API_KEY` | secret | Only needed while the AI is on. |
-| `AI_ENABLED` | secret (overrides `fly.toml`, which says `false`) | The kill switch: `true` or `false`. |
-| `AI_GLOBAL_DAILY_TOKENS`, `AI_USER_DAILY_RUNS` | secret or `fly.toml` | The caps on what the AI can cost: tokens per day for everybody together, and runs per day for one person. See [AI analyses](#ai-analyses) for the others. |
-| `TRUST_PROXY` | `fly.toml` | `2`: meant to count Vercel and Fly. In practice the API still sees Vercel's address, not the visitor's (see [Known limits](#known-limits)). |
-| `DOCS_ENABLED` | `fly.toml` | Off by default in production: the live API does not publish its own route list. |
+| Setting                                        | Where                                             | Meaning                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                 | secret                                            | The Supabase **session pooler** address (port 5432, user `postgres.<project reference>`). It works over IPv4, and the API sets the time zone per connection, which the transaction pooler would lose. A URL that carries `ssl` parameters is refused: use `DATABASE_SSL`. |
+| `JWT_ACCESS_SECRET`                            | secret                                            | Generated, at least 32 random characters.                                                                                                                                                                                                                                 |
+| `CORS_ORIGINS`                                 | secret                                            | `https://<the Vercel address>`, no trailing slash.                                                                                                                                                                                                                        |
+| `DATABASE_SSL_CA`                              | secret                                            | The certificate authority that signed Supabase's certificate (Supabase publishes it as `prod-ca-2021.crt`), as text. The API checks the certificate strictly, and without this it refuses Supabase's.                                                                     |
+| `ANTHROPIC_API_KEY`                            | secret                                            | Only needed while the AI is on.                                                                                                                                                                                                                                           |
+| `AI_ENABLED`                                   | secret (overrides `fly.toml`, which says `false`) | The kill switch: `true` or `false`.                                                                                                                                                                                                                                       |
+| `AI_GLOBAL_DAILY_TOKENS`, `AI_USER_DAILY_RUNS` | secret or `fly.toml`                              | The caps on what the AI can cost: tokens per day for everybody together, and runs per day for one person. See [AI analyses](#ai-analyses) for the others.                                                                                                                 |
+| `TRUST_PROXY`                                  | `fly.toml`                                        | `2`: meant to count Vercel and Fly. In practice the API still sees Vercel's address, not the visitor's (see [Known limits](#known-limits)).                                                                                                                               |
+| `DOCS_ENABLED`                                 | `fly.toml`                                        | Off by default in production: the live API does not publish its own route list.                                                                                                                                                                                           |
 
 ### Supabase
 
@@ -536,13 +536,13 @@ The providers change their screens, commands and prices: check their current doc
 Run these from the repository root, logged in to Fly (`flyctl auth login`). Replace `<app>` with the
 Fly app name in `fly.toml`.
 
-| To | Command |
-| --- | --- |
-| See whether the API is up | open `https://<app>.fly.dev/health` (or `flyctl status --app <app>`) |
-| Read the API's log | `flyctl logs --app <app>` |
-| Deploy a new API version | `flyctl deploy --ha=false --app <app>` (the migrations run first; a failed one stops the deploy) |
-| List the secrets (names only) | `flyctl secrets list --app <app>` |
-| Roll back | `flyctl releases --app <app>`, then `flyctl deploy --ha=false --image <the earlier image> --app <app>` |
+| To                            | Command                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| See whether the API is up     | open `https://<app>.fly.dev/health` (or `flyctl status --app <app>`)                                   |
+| Read the API's log            | `flyctl logs --app <app>`                                                                              |
+| Deploy a new API version      | `flyctl deploy --ha=false --app <app>` (the migrations run first; a failed one stops the deploy)       |
+| List the secrets (names only) | `flyctl secrets list --app <app>`                                                                      |
+| Roll back                     | `flyctl releases --app <app>`, then `flyctl deploy --ha=false --image <the earlier image> --app <app>` |
 
 The web app is not deployed by hand: Vercel builds it when `main` changes. A deploy or a crash stops
 the AI runs that are going; they are written down as failed the next time the API starts.
