@@ -1,0 +1,9 @@
+.route-error {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--space-5) 0;
+}
+
+.route-error__actions {
+  margin-top: var(--space-3);
+}
