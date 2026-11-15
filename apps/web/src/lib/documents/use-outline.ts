@@ -58,11 +58,6 @@ export function findNode(
   return undefined;
 }
 
-/** The number of items in the tree. */
-export function countNodes(nodes: readonly OutlineNode[]): number {
-  return nodes.reduce((total, node) => total + 1 + node.children.length, 0);
-}
-
 export type OutlineView =
   | { readonly status: "loading" }
   | { readonly status: "failed"; readonly message: string }

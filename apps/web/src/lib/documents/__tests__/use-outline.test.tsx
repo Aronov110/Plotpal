@@ -12,7 +12,7 @@ import { problemResponse } from "../../../test-support/projects-handlers.ts";
 import { deferred } from "../../../test-support/session-harness.ts";
 import { signedInManager } from "../../../test-support/signed-in-manager.ts";
 import { AuthProvider } from "../../auth/session.tsx";
-import { buildTree, countNodes, findNode, type OutlineView, useOutline } from "../use-outline.ts";
+import { buildTree, findNode, type OutlineView, useOutline } from "../use-outline.ts";
 
 describe("buildTree", () => {
   it("is empty for an empty outline", () => {
@@ -75,7 +75,7 @@ describe("buildTree", () => {
   });
 });
 
-describe("findNode and countNodes", () => {
+describe("findNode", () => {
   const act = makeOutlineItem({ title: "Act" });
   const scene = makeOutlineItem({ title: "Scene", parentId: act.id });
   const tree = buildTree([act, scene, makeOutlineItem({ title: "Other act" })]);
@@ -94,11 +94,6 @@ describe("findNode and countNodes", () => {
 
   it("finds nothing for an unknown id", () => {
     expect(findNode(tree, "nope")).toBeUndefined();
-  });
-
-  it("counts every item, scenes included", () => {
-    expect(countNodes(tree)).toBe(3);
-    expect(countNodes([])).toBe(0);
   });
 });
 

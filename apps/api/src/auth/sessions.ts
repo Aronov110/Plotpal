@@ -80,25 +80,6 @@ export async function findSessionFamily(
   return row;
 }
 
-/** The user and login family of a token that is neither revoked nor expired. */
-export async function findLiveSession(
-  db: Database,
-  tokenHash: string,
-): Promise<{ userId: string; familyId: string } | undefined> {
-  const [row] = await db
-    .select({ userId: refreshSessions.userId, familyId: refreshSessions.familyId })
-    .from(refreshSessions)
-    .where(
-      and(
-        eq(refreshSessions.tokenHash, tokenHash),
-        isNull(refreshSessions.revokedAt),
-        gt(refreshSessions.expiresAt, sql`now()`),
-      ),
-    )
-    .limit(1);
-  return row;
-}
-
 export interface RotateOptions {
   readonly tokenHash: string;
   readonly newTokenHash: string;
