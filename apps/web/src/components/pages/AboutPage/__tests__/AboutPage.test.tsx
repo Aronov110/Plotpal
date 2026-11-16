@@ -9,7 +9,6 @@ const THINGS_IT_DOES = [
   /Outline and write\./,
   /No lost work between tabs\./,
   /Plot-hole finder and idea generator\./,
-  /Light and dark themes/,
 ] as const;
 
 async function openAbout(options: { signedIn?: boolean } = {}) {
@@ -49,9 +48,9 @@ describe("AboutPage", () => {
     expect(list).toHaveTextContent(lead);
   });
 
-  it("lists exactly four things it does", async () => {
+  it("lists exactly three things it does", async () => {
     await openAbout();
-    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("says that a quote that is not in the manuscript is marked, because that is what the app does", async () => {

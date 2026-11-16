@@ -48,10 +48,6 @@ export function AboutPage(): ReactElement {
             Every quote is checked against your manuscript, and one that is not really there is
             clearly marked as not found.
           </li>
-          <li>
-            <strong>Light and dark themes</strong>, and built to work with a keyboard and a screen
-            reader (aiming at WCAG 2.2 AA).
-          </li>
         </ul>
       </section>
 
