@@ -1,9 +1,11 @@
 import type { ReactElement } from "react";
 import { Link, useLocation } from "react-router";
 import { usePageTitle } from "../../../lib/navigation/use-page-title.ts";
+import { DemoButton } from "../../organisms/DemoButton/DemoButton.tsx";
 import { LoginForm } from "../../organisms/LoginForm/LoginForm.tsx";
 import { SignOutNotice } from "../../organisms/SignOutNotice/SignOutNotice.tsx";
 import { AuthLayout } from "../../templates/AuthLayout/AuthLayout.tsx";
+import "./LoginPage.css";
 
 /** The login screen. A saved return address travels on to the sign-up screen and back. */
 export function LoginPage(): ReactElement {
@@ -25,6 +27,9 @@ export function LoginPage(): ReactElement {
     >
       <SignOutNotice />
       <LoginForm />
+      <div className="login-page__demo">
+        <DemoButton />
+      </div>
     </AuthLayout>
   );
 }

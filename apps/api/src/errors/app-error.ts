@@ -156,6 +156,20 @@ export class RateLimitError extends AppError {
   }
 }
 
+/** 503: too many demo accounts are alive at once. They expire by themselves, so trying later works. */
+export class DemoUnavailableError extends AppError {
+  constructor(options: CauseOption = {}) {
+    super({
+      status: 503,
+      code: "demo-unavailable",
+      title: "Service Unavailable",
+      detail: "The demo is full right now. Try again in a few minutes, or create an account.",
+      headers: { "retry-after": "300" },
+      ...options,
+    });
+  }
+}
+
 /** 503: the server is temporarily too busy, for example when too many password hashes are queued. */
 export class ServiceBusyError extends AppError {
   constructor(options: CauseOption = {}) {

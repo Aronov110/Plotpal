@@ -186,10 +186,11 @@ describe("buildE2eSettings: the server settings", () => {
     expect(env.RATE_LIMIT_MAX).toBeGreaterThanOrEqual(100_000);
   });
 
-  it("relaxes the per-address limits of sign-up, login, refresh and logout", () => {
+  it("relaxes the per-address limits of sign-up, the demo, login, refresh and logout", () => {
     const { authLimits } = buildE2eSettings(source());
     for (const rule of [
       authLimits.register,
+      authLimits.demo,
       authLimits.login,
       authLimits.refresh,
       authLimits.logout,

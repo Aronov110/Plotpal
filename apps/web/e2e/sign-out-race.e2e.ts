@@ -59,7 +59,10 @@ async function logInWhileSignOutIsHeld(
     // 2. Press "Log in" while the old answer is still on its way. The form shows it is working.
     await submitLoginForm(page, second.email, second.password);
     await expect(page.getByRole("button", { name: "Log in" })).toHaveAttribute("aria-busy", "true");
-    await expect(page.getByRole("status")).toHaveText("Signing you in…");
+    // The login screen has two status lines (the form's and the demo button's): this is the form's.
+    await expect(page.getByRole("status").filter({ hasText: "Signing you in…" })).toHaveText(
+      "Signing you in…",
+    );
     expect(events).toEqual([]);
 
     // 3. Let the old answer arrive, and wait until the browser has it.

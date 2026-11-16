@@ -1,0 +1,25 @@
+/* A fieldset gives the button, its note and its status one name for a screen reader; the browser's own frame is removed. */
+.demo-button {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.demo-button__note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/*
+ * Always in the page, so a screen reader hears the text when it appears, and it keeps its height
+ * when empty, so the screen does not jump when "Setting up your demo…" shows and goes.
+ */
+.demo-button__status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--color-text-muted);
+}

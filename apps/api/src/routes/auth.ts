@@ -19,6 +19,7 @@ import {
   sessionResponseSchema,
 } from "../auth/schemas.ts";
 import { type AuthResult, type AuthService, SESSION_EXPIRED } from "../auth/service.ts";
+import type { DemoService } from "../demo/service.ts";
 import { ForbiddenError, RateLimitError, UnauthorizedError } from "../errors/app-error.ts";
 import { RATE_LIMIT_CACHE_SIZE } from "../plugins/security.ts";
 
@@ -30,6 +31,8 @@ export interface AuthRoutesOptions {
   readonly allowedOrigins: readonly string[];
   readonly cookies: CookieSettings;
   readonly limits: AuthLimits;
+  /** Leave out to switch "Try the demo" off: the route is then not registered and answers 404. */
+  readonly demo?: DemoService | undefined;
 }
 
 const COOKIE_NOTE =
@@ -159,6 +162,39 @@ export async function authRoutes(app: FastifyInstance, options: AuthRoutesOption
       return reply.status(201).send(sessionBody(result));
     },
   );
+
+  if (options.demo !== undefined) {
+    const demo = options.demo;
+    typed.post(
+      "/demo",
+      {
+        preValidation: [originGuard],
+        config: { rateLimit: rule(limits.demo) },
+        schema: {
+          tags: ["auth"],
+          summary: "Start a demo account and sign in",
+          description:
+            "For people who want to look around without signing up. Makes a fresh throwaway account " +
+            "with a sample story in it and signs it in, exactly like sign-up does (same body, same " +
+            "cookies). The account and everything in it are deleted 24 hours later. Needs an " +
+            "`Origin` header that is on the server's list and sends no body. Answers 429 when this " +
+            "address has started too many demos, and 503 when too many demo accounts are alive.",
+          response: { 201: sessionResponseSchema },
+        },
+      },
+      async (request, reply) => {
+        const person = await demo.start();
+        const result = await auth.signInAs(person);
+        setAuthCookies(reply, result, cookies);
+        // The id only: never the email, a token or a cookie.
+        request.log.info(
+          { event: "demo.started", userId: person.id },
+          "A demo account was started",
+        );
+        return reply.status(201).send(sessionBody(result));
+      },
+    );
+  }
 
   typed.post(
     "/login",

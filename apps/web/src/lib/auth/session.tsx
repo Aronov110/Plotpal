@@ -15,6 +15,8 @@ export interface AuthContextValue {
   readonly state: SessionState;
   readonly login: SessionManager["login"];
   readonly register: SessionManager["register"];
+  /** Starts a throwaway demo account with a sample story and signs in as it. */
+  readonly startDemo: SessionManager["startDemo"];
   /**
    * Signs out on this page at once, then tells the server. Never rejects.
    * @returns whether the server confirmed (see `signOutUnconfirmed`). `false` also covers an
@@ -71,6 +73,11 @@ export function AuthProvider({ children, manager }: AuthProviderProps): ReactEle
     [active],
   );
 
+  const startDemo = useCallback<SessionManager["startDemo"]>(async () => {
+    await active.startDemo();
+    setSignOutUnconfirmed(false);
+  }, [active]);
+
   const signOut = useCallback<SessionManager["signOut"]>(async () => {
     let confirmed = false;
     try {
@@ -85,8 +92,16 @@ export function AuthProvider({ children, manager }: AuthProviderProps): ReactEle
   }, [active]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ state, login, register, signOut, signOutUnconfirmed, withAuth: active.withAuth }),
-    [state, login, register, signOut, signOutUnconfirmed, active],
+    () => ({
+      state,
+      login,
+      register,
+      startDemo,
+      signOut,
+      signOutUnconfirmed,
+      withAuth: active.withAuth,
+    }),
+    [state, login, register, startDemo, signOut, signOutUnconfirmed, active],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

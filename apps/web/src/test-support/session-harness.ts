@@ -73,6 +73,7 @@ export function setup(options: { csrf?: string | undefined } = {}) {
   const api = {
     register: vi.fn<AuthApi["register"]>(),
     login: vi.fn<AuthApi["login"]>(),
+    demo: vi.fn<AuthApi["demo"]>(),
     refresh: vi.fn<AuthApi["refresh"]>(),
     logout: vi.fn<AuthApi["logout"]>().mockResolvedValue(undefined),
     me: vi.fn<AuthApi["me"]>(),

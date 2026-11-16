@@ -86,6 +86,7 @@ export function buildE2eSettings(
     authLimits: {
       ...DEFAULT_AUTH_LIMITS,
       register: UNREACHED,
+      demo: UNREACHED,
       login: UNREACHED,
       refresh: UNREACHED,
       logout: UNREACHED,

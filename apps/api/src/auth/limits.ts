@@ -20,6 +20,11 @@ export interface AuthLimits {
    * so it must stay expensive to reach: it takes this many failures, and correct logins do not count.
    */
   readonly loginFailuresPerEmail: RateRule;
+  /**
+   * "Try the demo", per client address. It makes an account and a story, so it is limited like
+   * sign-up, but looser: a few visitors in one hour must all get in.
+   */
+  readonly demo: RateRule;
   /** Per client address. */
   readonly refresh: RateRule;
   /** Per client address. */
@@ -36,6 +41,7 @@ export const DEFAULT_AUTH_LIMITS: AuthLimits = {
   login: { max: 10, windowSeconds: 60 },
   loginFailuresPerEmailAndIp: { max: 5, windowSeconds: 900 },
   loginFailuresPerEmail: { max: 50, windowSeconds: 900 },
+  demo: { max: 20, windowSeconds: 3600 },
   refresh: { max: 30, windowSeconds: 60 },
   logout: { max: 30, windowSeconds: 60 },
 };

@@ -7,6 +7,7 @@ import type { AuthLimits } from "../auth/limits.ts";
 import { createPasswordHasher } from "../auth/password.ts";
 import type { DatabaseHandle } from "../db/client.ts";
 import { connectTestDatabase, resetTables } from "../db/test-support/test-database.ts";
+import type { DemoConfig } from "../demo/service.ts";
 import type { DocumentLimits } from "../documents/limits.ts";
 import type { ProjectLimits } from "../projects/limits.ts";
 import { LogCollector } from "./log-collector.ts";
@@ -25,6 +26,7 @@ export const NO_LIMITS: AuthLimits = {
   login: GENEROUS,
   loginFailuresPerEmailAndIp: GENEROUS,
   loginFailuresPerEmail: GENEROUS,
+  demo: GENEROUS,
   refresh: GENEROUS,
   logout: GENEROUS,
 };
@@ -48,6 +50,8 @@ export interface AuthTestOptions {
   readonly aiConfig?: AiConfig;
   /** Fails the runs left `pending`, as the real server does when it starts. */
   readonly aiSweepOnStart?: boolean;
+  /** Replaces the demo's lifetime and cap, so a test can reach the cap with two accounts. */
+  readonly demo?: DemoConfig;
 }
 
 /**
@@ -69,6 +73,7 @@ export async function buildAuthTestApp(options: AuthTestOptions = {}): Promise<A
     ...(options.aiClient === undefined ? {} : { aiClient: options.aiClient }),
     ...(options.aiConfig === undefined ? {} : { aiConfig: options.aiConfig }),
     ...(options.aiSweepOnStart === undefined ? {} : { aiSweepOnStart: options.aiSweepOnStart }),
+    ...(options.demo === undefined ? {} : { demo: options.demo }),
     ...(options.documentLockTimeoutMs === undefined
       ? {}
       : { documentLockTimeoutMs: options.documentLockTimeoutMs }),

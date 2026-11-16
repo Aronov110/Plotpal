@@ -71,6 +71,12 @@ export interface SessionManager {
    */
   register(input: RegisterInput): Promise<void>;
   /**
+   * Starts a demo: the server makes a throwaway account with a sample story, and this page is signed
+   * in as it. Waits for a pending sign-out like {@link SessionManager.login}.
+   * @throws ApiError, NetworkError or ResponseShapeError; the state does not change then.
+   */
+  startDemo(): Promise<void>;
+  /**
    * Signs out on this page at once, tells the other tabs, then tells the server.
    * @returns whether the server confirmed. `false` means the login cookie may still be valid.
    */
@@ -347,6 +353,11 @@ export function createSessionManager(overrides: Partial<SessionManagerDeps> = {}
     async register(input) {
       if (pendingLogouts.size > 0) await whenLogoutsAreOver();
       beginSession(await deps.api.register(input));
+    },
+
+    async startDemo() {
+      if (pendingLogouts.size > 0) await whenLogoutsAreOver();
+      beginSession(await deps.api.demo());
     },
 
     async signOut() {

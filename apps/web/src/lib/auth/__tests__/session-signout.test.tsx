@@ -12,7 +12,7 @@ const USER = { id: "user-1", email: "ada@example.com", displayName: null };
 const SESSION = { user: USER, accessToken: "access-1", expiresIn: 900 };
 
 function Probe() {
-  const { state, signOutUnconfirmed, signOut, login, register } = useAuth();
+  const { state, signOutUnconfirmed, signOut, login, register, startDemo } = useAuth();
   const [result, setResult] = useState("none");
   return (
     <div>
@@ -47,6 +47,15 @@ function Probe() {
         }}
       >
         sign up
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          // A refused demo is an expected outcome in some tests; the demo button shows it.
+          startDemo().catch(() => undefined);
+        }}
+      >
+        try the demo
       </button>
     </div>
   );
@@ -192,6 +201,39 @@ describe("sign-out that the server could not confirm", () => {
 
     await screen.findByText("signed-in");
     expect(screen.getByTestId("unconfirmed")).toHaveTextContent("false");
+  });
+
+  it("goes away when the person starts a demo", async () => {
+    server.use(
+      http.post("/auth/logout", () => HttpResponse.error()),
+      http.post("/auth/demo", () => HttpResponse.json(SESSION, { status: 201 })),
+    );
+    await signedInProbe();
+    fireEvent.click(screen.getByRole("button", { name: "sign out" }));
+    await screen.findByText("confirmed:false");
+    expect(screen.getByTestId("unconfirmed")).toHaveTextContent("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "try the demo" }));
+
+    await screen.findByText("signed-in");
+    expect(screen.getByTestId("unconfirmed")).toHaveTextContent("false");
+  });
+
+  it("stays reported when a demo cannot be started", async () => {
+    server.use(
+      http.post("/auth/logout", () => HttpResponse.error()),
+      http.post("/auth/demo", () =>
+        HttpResponse.json({ type: "urn:plotpal:problem:demo-unavailable" }, { status: 503 }),
+      ),
+    );
+    await signedInProbe();
+    fireEvent.click(screen.getByRole("button", { name: "sign out" }));
+    await screen.findByText("confirmed:false");
+
+    fireEvent.click(screen.getByRole("button", { name: "try the demo" }));
+
+    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("signed-out"));
+    expect(screen.getByTestId("unconfirmed")).toHaveTextContent("true");
   });
 
   it("stays reported when a login attempt fails", async () => {

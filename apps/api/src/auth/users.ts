@@ -42,6 +42,8 @@ export interface NewUserInput {
   readonly email: string;
   readonly passwordHash: string;
   readonly displayName: string | null;
+  /** Makes the account a throwaway demo that may be deleted after this moment. Real accounts leave it out. */
+  readonly demoExpiresAt?: Date | undefined;
 }
 
 /** Inserts a user. Throws {@link EmailTakenError} when the email exists, even under a race. */
@@ -53,6 +55,7 @@ export async function createUser(db: Database, input: NewUserInput): Promise<Use
         email: input.email,
         passwordHash: input.passwordHash,
         displayName: input.displayName,
+        demoExpiresAt: input.demoExpiresAt ?? null,
       })
       .returning();
     if (user === undefined) throw new Error("The insert returned no row");

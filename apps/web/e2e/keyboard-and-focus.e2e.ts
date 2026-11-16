@@ -57,6 +57,8 @@ test.describe("using only the keyboard", () => {
       page.getByLabel("Password", { exact: true }),
       page.getByRole("button", { name: "Show password" }),
       page.getByRole("button", { name: "Log in" }),
+      // "Try the demo" sits under the form, before the link to sign-up, as it does on the screen.
+      page.getByRole("button", { name: "Try the demo" }),
       ...(browserName === "webkit" ? [] : [page.getByRole("link", { name: "Create one" })]),
     ];
     await page.getByLabel("Email").focus();
@@ -170,6 +172,8 @@ test.describe("the focus ring", () => {
       page.getByLabel("Password", { exact: true }),
       page.getByRole("button", { name: "Show password" }),
       page.getByRole("button", { name: "Log in" }),
+      // "Try the demo" sits under the form, before the link to sign-up, as it does on the screen.
+      page.getByRole("button", { name: "Try the demo" }),
       ...(browserName === "webkit" ? [] : [page.getByRole("link", { name: "Create one" })]),
     ].entries()) {
       if (index > 0) await page.keyboard.press("Tab");
