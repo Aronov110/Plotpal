@@ -14,6 +14,7 @@ import { createAccessTokens, createCsrfTokens } from "./auth/tokens.ts";
 import type { Env } from "./config/env.ts";
 import { buildLoggerOptions } from "./config/logger.ts";
 import type { Database, DatabaseHandle } from "./db/client.ts";
+import { createDemoService, DEFAULT_DEMO_CONFIG, type DemoConfig } from "./demo/service.ts";
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from "./documents/limits.ts";
 import { createDocumentsService } from "./documents/service.ts";
 import { frameworkErrorHandler, registerErrorHandling } from "./errors/error-handler.ts";
@@ -75,6 +76,8 @@ export interface AppDependencies {
    * runs live inside one process, so each process that starts may sweep what the last one left.
    */
   readonly aiSweepOnStart?: boolean;
+  /** Replaces the demo's lifetime and cap. Tests use it to reach the cap quickly. */
+  readonly demo?: DemoConfig;
 }
 
 /** Builds the Fastify app without listening, so tests can use `app.inject()`. */
@@ -150,6 +153,14 @@ export function buildApp(env: Env, deps: AppDependencies): FastifyInstance {
   registerOpenApi(app, { docs: env.DOCS_ENABLED });
   app.register(cookie);
 
+  // One of each, shared by the routes and by the demo, which fills a new account through them so the
+  // sample story obeys the same rules (versions, order, sizes) as anything a person writes.
+  const projectsService = createProjectsService(deps.database.db);
+  const documentsService = createDocumentsService(
+    deps.database.db,
+    deps.documentLockTimeoutMs === undefined ? {} : { lockTimeoutMs: deps.documentLockTimeoutMs },
+  );
+
   app.register(healthRoutes);
   app.register(authRoutes, {
     prefix: "/auth",
@@ -158,11 +169,20 @@ export function buildApp(env: Env, deps: AppDependencies): FastifyInstance {
     // Browsers refuse Secure cookies on plain http, which local development uses.
     cookies: { secure: env.NODE_ENV === "production" },
     limits: deps.authLimits ?? DEFAULT_AUTH_LIMITS,
+    demo: env.DEMO_ENABLED
+      ? createDemoService({
+          db: deps.database.db,
+          hasher,
+          projects: projectsService,
+          documents: documentsService,
+          config: deps.demo ?? DEFAULT_DEMO_CONFIG,
+        })
+      : undefined,
   });
   app.register(projectsRoutes, {
     prefix: "/projects",
     auth,
-    projects: createProjectsService(deps.database.db),
+    projects: projectsService,
     limits: deps.projectLimits ?? DEFAULT_PROJECT_LIMITS,
   });
   const aiConfig = deps.aiConfig ?? aiConfigFromEnv(env);
@@ -196,10 +216,7 @@ export function buildApp(env: Env, deps: AppDependencies): FastifyInstance {
   app.register(documentsRoutes, {
     prefix: "/projects/:projectId/documents",
     auth,
-    documents: createDocumentsService(
-      deps.database.db,
-      deps.documentLockTimeoutMs === undefined ? {} : { lockTimeoutMs: deps.documentLockTimeoutMs },
-    ),
+    documents: documentsService,
     limits: deps.documentLimits ?? DEFAULT_DOCUMENT_LIMITS,
   });
 

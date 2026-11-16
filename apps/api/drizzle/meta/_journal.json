@@ -43,6 +43,13 @@
       "when": 1794675080078,
       "tag": "0005_enable_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794856685810,
+      "tag": "0006_demo_accounts",
+      "breakpoints": true
     }
   ]
 }

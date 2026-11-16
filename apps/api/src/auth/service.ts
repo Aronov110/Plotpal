@@ -97,6 +97,12 @@ export interface AuthService {
   register(input: RegisterInput): Promise<AuthResult>;
   /** Throws UnauthorizedError with one fixed message for any failure. */
   login(input: LoginInput): Promise<AuthResult>;
+  /**
+   * Starts a login for a person the server has already decided on, with no password check. Never
+   * call it with anything that came from a request: it exists for the demo, whose account the server
+   * has just made itself.
+   */
+  signInAs(user: PublicUser): Promise<AuthResult>;
   /** Swaps the refresh token for the next one. Throws UnauthorizedError for any failure. */
   refresh(refreshToken: string): Promise<AuthResult>;
   /** Ends the login. Never fails because of the token: a missing or bad one is a no-op. */
@@ -213,6 +219,8 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       }
       return startLogin(toPublicUser(user));
     },
+
+    signInAs: (user) => startLogin(user),
 
     async refresh(refreshToken) {
       const expired = () => new UnauthorizedError(SESSION_EXPIRED);

@@ -36,6 +36,11 @@ export interface LoginInput {
 export interface AuthApi {
   register(input: RegisterInput): Promise<SessionResponse>;
   login(input: LoginInput): Promise<SessionResponse>;
+  /**
+   * "Try the demo": the server makes a throwaway account with a sample story and signs it in, like
+   * sign-up does. Needs nothing from the visitor, so it sends no body, no token and no CSRF code.
+   */
+  demo(): Promise<SessionResponse>;
   /** Uses the refresh cookie (sent by the browser) and the CSRF cookie. Sends no body. */
   refresh(): Promise<SessionResponse>;
   /** Ends the login on the server. Sends no body. */
@@ -53,6 +58,8 @@ export const authApi: AuthApi = {
 
   login: ({ email, password }) =>
     apiJson("/auth/login", sessionSchema, { method: "POST", json: { email, password } }),
+
+  demo: () => apiJson("/auth/demo", sessionSchema, { method: "POST" }),
 
   // No `json`: the API rejects a refresh or logout that has a JSON content type but an empty body.
   refresh: () => apiJson("/auth/refresh", sessionSchema, { method: "POST", csrf: true }),

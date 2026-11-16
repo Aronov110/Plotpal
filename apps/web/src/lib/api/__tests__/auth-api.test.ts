@@ -2,7 +2,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { setCookie } from "../../../test-support/cookies.ts";
 import { server } from "../../../test-support/msw-server.ts";
-import { setAccessToken } from "../../auth/token-store.ts";
+import { clearAccessToken, setAccessToken } from "../../auth/token-store.ts";
 import { authApi } from "../auth-api.ts";
 import { ApiError, ResponseShapeError } from "../problem.ts";
 
@@ -220,5 +220,56 @@ describe("authApi.me", () => {
   it("rejects an answer without a user", async () => {
     answer("get", "/auth/me", {});
     await expect(authApi.me()).rejects.toBeInstanceOf(ResponseShapeError);
+  });
+});
+
+describe("authApi.demo", () => {
+  it("posts to /auth/demo with no body and no content type, and returns the session", async () => {
+    const calls = answer("post", "/auth/demo", SESSION, 201);
+    const session = await authApi.demo();
+    expect(session).toEqual(SESSION);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body).toBe("");
+    expect(calls[0]?.headers.get("content-type")).toBeNull();
+  });
+
+  it("needs no login and no CSRF code, because there is nothing to protect yet", async () => {
+    setAccessToken("stale-token");
+    setCookie("csrf_token", "code-1");
+    const calls = answer("post", "/auth/demo", SESSION, 201);
+    await authApi.demo();
+    expect(calls[0]?.headers.get("authorization")).toBeNull();
+    expect(calls[0]?.headers.get("x-csrf-token")).toBeNull();
+    clearAccessToken();
+  });
+
+  it.each([
+    [404, undefined],
+    [429, "60"],
+    [503, "300"],
+  ])("throws an ApiError with the status for a %i", async (status, retryAfter) => {
+    server.use(
+      http.post("/auth/demo", () =>
+        HttpResponse.json(
+          { type: "urn:plotpal:problem:demo-unavailable", status },
+          { status, headers: retryAfter === undefined ? {} : { "retry-after": retryAfter } },
+        ),
+      ),
+    );
+    await expect(authApi.demo()).rejects.toMatchObject({
+      name: "ApiError",
+      status,
+      retryAfterSeconds: retryAfter === undefined ? undefined : Number(retryAfter),
+    });
+  });
+
+  it("refuses an answer that is not a session", async () => {
+    answer("post", "/auth/demo", { user: USER }, 201);
+    await expect(authApi.demo()).rejects.toBeInstanceOf(ResponseShapeError);
+  });
+
+  it("surfaces a refusal as an ApiError", async () => {
+    answer("post", "/auth/demo", { type: "urn:plotpal:problem:forbidden" }, 403);
+    await expect(authApi.demo()).rejects.toBeInstanceOf(ApiError);
   });
 });

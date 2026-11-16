@@ -36,6 +36,7 @@ describe("loadEnv", () => {
       AI_USER_DAILY_TOKENS: 1_000_000,
       AI_GLOBAL_DAILY_TOKENS: 5_000_000,
       AI_REQUEST_TIMEOUT_SECONDS: 600,
+      DEMO_ENABLED: true,
     });
   });
 
@@ -516,6 +517,22 @@ describe("the AI settings", () => {
 
     it.each(["", "yes", "1", "TRUE", "off"])("refuses %j", (value) => {
       expect(() => env({ AI_ENABLED: value })).toThrow(EnvValidationError);
+    });
+  });
+
+  describe("DEMO_ENABLED", () => {
+    it("is on by default, and can be switched off", () => {
+      expect(env().DEMO_ENABLED).toBe(true);
+      expect(env({ DEMO_ENABLED: "false" }).DEMO_ENABLED).toBe(false);
+      expect(env({ DEMO_ENABLED: "true" }).DEMO_ENABLED).toBe(true);
+    });
+
+    it.each(["", "yes", "1", "TRUE", "off"])("refuses %j", (value) => {
+      expect(() => env({ DEMO_ENABLED: value })).toThrow(EnvValidationError);
+    });
+
+    it("names the setting in the message, so the fix is obvious", () => {
+      expect(() => env({ DEMO_ENABLED: "maybe" })).toThrow(/DEMO_ENABLED must be true or false/);
     });
   });
 

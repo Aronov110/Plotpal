@@ -172,6 +172,11 @@ const aiEnabledSchema = z
   .default("true")
   .transform((value) => value === "true");
 
+const demoEnabledSchema = z
+  .enum(["true", "false"], { error: "DEMO_ENABLED must be true or false" })
+  .default("true")
+  .transform((value) => value === "true");
+
 const envSchema = z
   .object({
     NODE_ENV: nodeEnvSchema,
@@ -223,6 +228,11 @@ const envSchema = z
       .default(5_000_000),
     /** How long one run may take before it is given up. */
     AI_REQUEST_TIMEOUT_SECONDS: z.coerce.number().int().min(30).max(1800).default(600),
+    /**
+     * A kill switch for "Try the demo": `false` removes `POST /auth/demo` altogether (the address
+     * answers 404), so no more demo accounts can be made.
+     */
+    DEMO_ENABLED: demoEnabledSchema,
   })
   .transform((raw, ctx) => {
     const { CORS_ORIGINS: rawOrigins, DOCS_ENABLED: rawDocs, ...rest } = raw;

@@ -81,6 +81,7 @@ All under `/auth`; the full reference is at `/docs/`.
 | --------------------- | ------------------------------------------------------- | ---------------------------------- |
 | `POST /auth/register` | `Origin`                                                | access token + cookies             |
 | `POST /auth/login`    | `Origin`                                                | access token + cookies             |
+| `POST /auth/demo`     | `Origin`, no body                                       | access token + cookies             |
 | `POST /auth/refresh`  | `Origin`, `refresh_token` cookie, `X-CSRF-Token` header | new access token + rotated cookies |
 | `POST /auth/logout`   | `Origin`, `refresh_token` cookie, `X-CSRF-Token` header | 204, cookies cleared               |
 | `GET /auth/me`        | `Authorization: Bearer <access token>`                  | the signed-in user                 |
@@ -97,6 +98,27 @@ In production both names start with `__Host-`: browsers then accept the cookie o
 `Secure`, has `Path=/` and no `Domain`, and refuse one set by another host, so a sibling subdomain
 cannot plant its own login cookies in a visitor's browser. Development uses the plain names (and
 `Path=/auth` for the refresh cookie) because browsers refuse `Secure` cookies over plain http.
+
+### The demo
+
+**Try the demo** (a button on the home page and on the login page) lets a visitor look around without
+signing up. `POST /auth/demo` makes a fresh throwaway account with a short sample story, "The Last
+Light" (with two plot holes put in on purpose, so the AI has something real to find), and signs it in
+exactly like sign-up does. Every visitor gets their own account, so nobody sees or breaks anybody
+else's copy, and each has their own AI runs under the same limits as a real account.
+
+- **It deletes itself.** A demo account lives 24 hours (`users.demo_expires_at`; real accounts have
+  none, which is what keeps the clean-up away from them). There is no scheduler: expired demos are
+  deleted when the next demo starts, and the database removes the account's projects, documents,
+  sessions and AI results together with it.
+- **It is bounded.** At most 200 demo accounts at once (a 503 "the demo is full" beyond that) and 20
+  starts an hour per address (a 429). The address is Vercel's (see "Known limits"), so in practice that
+  limit is shared by all visitors.
+- **It has no password.** The account holds a hash of a random password that was thrown away, so it can
+  only be reached through the session the button starts.
+- **It can be switched off** with `DEMO_ENABLED=false` (see "Switching the demo off"): the route is then
+  not there, and the button says so and points to sign-up.
+- **It needs the database.** If the Supabase free project has paused, the button fails until it wakes.
 
 ### Web app
 
@@ -508,6 +530,7 @@ only.
 | `AI_ENABLED`                                   | secret (overrides `fly.toml`, which says `false`) | The kill switch: `true` or `false`.                                                                                                                                                                                                                                       |
 | `AI_GLOBAL_DAILY_TOKENS`, `AI_USER_DAILY_RUNS` | secret or `fly.toml`                              | The caps on what the AI can cost: tokens per day for everybody together, and runs per day for one person. See [AI analyses](#ai-analyses) for the others.                                                                                                                 |
 | `TRUST_PROXY`                                  | `fly.toml`                                        | `2`: meant to count Vercel and Fly. In practice the API still sees Vercel's address, not the visitor's (see [Known limits](#known-limits)).                                                                                                                               |
+| `DEMO_ENABLED`                                 | secret or `fly.toml`                              | The kill switch for "Try the demo": `true` (the default) or `false`.                                                                                                                                                                                                      |
 | `DOCS_ENABLED`                                 | `fly.toml`                                        | Off by default in production: the live API does not publish its own route list.                                                                                                                                                                                           |
 
 ### Supabase
@@ -570,11 +593,18 @@ The AI is a kill switch plus a key, set with secrets so that `fly.toml` does not
 - **Off:** `flyctl secrets set --stage AI_ENABLED=false --app <app>`, then `flyctl secrets deploy --app <app>`.
   The key stays stored; the rest of the app works as before.
 
+### Switching the demo off
+
+`flyctl secrets set --stage DEMO_ENABLED=false --app <app>`, then `flyctl secrets deploy --app <app>`.
+No new demo accounts can be made then, and the button says the demo is switched off. Demo accounts that
+exist keep working until they expire. Expired ones are only deleted when a demo starts, so with the demo
+off they stay until it is switched on again; they are harmless but they are not removed.
+
 ### Known limits
 
 - **The API sees Vercel's address, not the visitor's.** Fly replaces `X-Forwarded-For` with the address
   it received the request from, which is Vercel's, so `TRUST_PROXY` cannot recover the visitor's. The
-  per-address limits (sign-up and login attempts per address, and the like) are therefore shared by
+  per-address limits (sign-up, demo and login attempts per address, and the like) are therefore shared by
   everybody. It is not a way around logging in: passwords are hashed and limited per account. A fix
   needs care, because any header that Vercel sets can also be made up by someone who calls the Fly
   address directly; a later step can make Fly accept only Vercel.
@@ -609,8 +639,8 @@ web app and a real API. It is not part of `bun run test`: it is slower and needs
   a running server, so your development servers (3000 and 5173) are left alone. The API is
   `apps/api/src/test-support/e2e-server.ts`: it drops and rebuilds a throwaway database
   `plotpal_e2e_test` on the server named by `TEST_DATABASE_URL`, listens on loopback only, and
-  relaxes only the per-address sign-up and login limits. It refuses `NODE_ENV=production`.
-- **What it covers:** the full sign-up, reload, sign-out and login journeys; the cookie flags
+  relaxes only the per-address sign-up, demo and login limits. It refuses `NODE_ENV=production`.
+- **What it covers:** the full sign-up, reload, sign-out and login journeys; the demo (one press signs in with the sample story, and visitors never share a copy); the cookie flags
   through the dev proxy; no token in browser storage; axe (accessibility) in light and dark mode
   with colour contrast; 320 px reflow; target size; keyboard and focus order; that the writing
   screen's files are not downloaded before a project is opened, and that a missing file reloads the
