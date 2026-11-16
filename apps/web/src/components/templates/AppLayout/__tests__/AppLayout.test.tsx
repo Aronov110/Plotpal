@@ -35,6 +35,31 @@ describe("AppLayout", () => {
     expect(screen.getByRole("link", { name: "Plotpal" })).toHaveAttribute("href", "/app");
   });
 
+  describe("the link to the About page", () => {
+    it("is in the header and goes to /about", async () => {
+      await renderLayout();
+      const link = within(screen.getByRole("banner")).getByRole("link", { name: "About" });
+      expect(link).toHaveAttribute("href", "/about");
+    });
+
+    it("comes after the name of the app and before the sign-out button", async () => {
+      await renderLayout();
+      const header = screen.getByRole("banner");
+      const brand = within(header).getByRole("link", { name: "Plotpal" });
+      const about = within(header).getByRole("link", { name: "About" });
+      const signOut = within(header).getByRole("button", { name: "Sign out" });
+      expect(brand.compareDocumentPosition(about) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        about.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("is not in the main area", async () => {
+      await renderLayout();
+      expect(within(screen.getByRole("main")).queryByRole("link", { name: "About" })).toBeNull();
+    });
+  });
+
   describe("who is signed in", () => {
     it("shows the display name when there is one", async () => {
       await renderLayout({ ...USER, displayName: "Ada" });

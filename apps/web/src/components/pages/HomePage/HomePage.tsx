@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { Link } from "react-router";
 import { useAuth } from "../../../lib/auth/session.tsx";
 import { usePageTitle } from "../../../lib/navigation/use-page-title.ts";
 import { ButtonLink } from "../../atoms/ButtonLink/ButtonLink.tsx";
@@ -32,6 +33,11 @@ export function HomePage(): ReactElement {
           <ButtonLink to="/app">Go to your projects</ButtonLink>
         </div>
       ) : null}
+      {state.status === "loading" ? null : (
+        <p className="home-page__about">
+          <Link to="/about">About Plotpal</Link>
+        </p>
+      )}
     </main>
   );
 }

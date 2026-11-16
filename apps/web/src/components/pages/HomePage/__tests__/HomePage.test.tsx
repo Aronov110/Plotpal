@@ -95,4 +95,52 @@ describe("HomePage", () => {
     renderApp();
     expect(await screen.findByRole("group", { name: "Colour theme" })).toBeInTheDocument();
   });
+
+  describe("the link to the About page", () => {
+    it("is offered to someone who is signed out", async () => {
+      renderApp();
+      expect(await screen.findByRole("link", { name: "About Plotpal" })).toHaveAttribute(
+        "href",
+        "/about",
+      );
+    });
+
+    it("is offered to someone who is signed in", async () => {
+      renderApp({ signedIn: true });
+      expect(await screen.findByRole("link", { name: "About Plotpal" })).toHaveAttribute(
+        "href",
+        "/about",
+      );
+    });
+
+    it("is not shown yet while the app checks for a login, so nothing flickers", async () => {
+      // With no login cookie the app knows at once that nobody is signed in. A cookie makes it ask
+      // the server, and the fake server holds its answer so the waiting state can be looked at.
+      const gate = deferred<undefined>();
+      setCookie("csrf_token", "code-1");
+      server.use(
+        http.post("/auth/refresh", async () => {
+          await gate.promise;
+          return HttpResponse.json({
+            user: { id: "u", email: "a@b.test", displayName: null },
+            accessToken: "t",
+            expiresIn: 900,
+          });
+        }),
+      );
+      renderApp();
+      expect(screen.getByRole("heading", { level: 1, name: "Plotpal" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "About Plotpal" })).not.toBeInTheDocument();
+      gate.resolve(undefined);
+      expect(await screen.findByRole("link", { name: "About Plotpal" })).toBeInTheDocument();
+    });
+
+    it("opens the About page when it is followed", async () => {
+      const { user } = renderApp();
+      await user.click(await screen.findByRole("link", { name: "About Plotpal" }));
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "About Plotpal" }),
+      ).toBeInTheDocument();
+    });
+  });
 });

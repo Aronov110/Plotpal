@@ -7,6 +7,7 @@ import { uniqueUser } from "./support/users.ts";
 /** The screens a signed-out visitor can reach, with the title each must have. */
 const SIGNED_OUT_SCREENS = [
   { path: "/", title: "Plotpal", heading: "Plotpal" },
+  { path: "/about", title: "About – Plotpal", heading: "About Plotpal" },
   { path: "/login", title: "Log in – Plotpal", heading: "Log in" },
   { path: "/register", title: "Create your account – Plotpal", heading: "Create your account" },
   { path: "/no-such-screen", title: "Page not found – Plotpal", heading: "Page not found" },

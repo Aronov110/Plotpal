@@ -1,6 +1,7 @@
 import { lazy, type ReactElement, Suspense } from "react";
 import { Route, Routes } from "react-router";
 import { LoadingState } from "./components/molecules/LoadingState/LoadingState.tsx";
+import { AboutPage } from "./components/pages/AboutPage/AboutPage.tsx";
 import { AppHomePage } from "./components/pages/AppHomePage/AppHomePage.tsx";
 import { HomePage } from "./components/pages/HomePage/HomePage.tsx";
 import { LoginPage } from "./components/pages/LoginPage/LoginPage.tsx";
@@ -40,6 +41,7 @@ export function AppRoutes(): ReactElement {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
       <Route element={<RedirectIfSignedIn />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

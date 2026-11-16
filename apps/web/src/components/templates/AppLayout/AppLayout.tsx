@@ -47,6 +47,7 @@ export function AppLayout({
           Plotpal
         </Link>
         <div className="app-layout__account">
+          <Link to="/about">About</Link>
           <ThemeSwitch />
           {name === undefined ? null : (
             <p className="app-layout__who">
