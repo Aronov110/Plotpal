@@ -124,6 +124,39 @@ test.describe("where the focus goes", () => {
   });
 });
 
+test.describe("the About page", () => {
+  test("from the home page: the link opens it, focus goes to its heading, and the way back works", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "About Plotpal" }).click();
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page.getByRole("heading", { level: 1, name: "About Plotpal" })).toBeFocused();
+
+    await page.getByRole("link", { name: "Go to the home page" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Plotpal" })).toBeFocused();
+  });
+
+  test("from the signed-in header: the link opens it and focus goes to its heading", async ({
+    page,
+  }) => {
+    await signUp(page, uniqueUser());
+    await page.getByRole("banner").getByRole("link", { name: "About" }).click();
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page.getByRole("heading", { level: 1, name: "About Plotpal" })).toBeFocused();
+  });
+
+  test("a signed-in person who opens or reloads /about stays on it", async ({ page }) => {
+    await signUp(page, uniqueUser());
+    await page.goto("/about");
+    await expect(page.getByRole("heading", { level: 1, name: "About Plotpal" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "About Plotpal" })).toBeVisible();
+    await expect(page).toHaveURL(/\/about$/);
+  });
+});
+
 test.describe("the focus ring", () => {
   test("is visible on every control of the login screen when reached with the keyboard", async ({
     page,
